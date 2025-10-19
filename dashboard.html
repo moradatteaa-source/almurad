@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة التحكم - نظام المراد</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Tahoma", Arial, sans-serif;
+      display: flex;
+      height: 100vh;
+      background: #f8f9fb;
+      overflow: hidden;
+    }
+
+    /* الشريط الجانبي */
+    .sidebar {
+      width: 260px;
+      background-color: #043B64;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.3s ease;
+      z-index: 1000;
+    }
+
+    .sidebar h2 {
+      text-align: center;
+      background-color: #FF6B2D;
+      padding: 15px;
+      margin: 0;
+      font-size: 18px;
+    }
+
+    .menu-item {
+      padding: 15px 20px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .menu-item:hover {
+      background-color: rgba(255,255,255,0.1);
+    }
+
+    .submenu {
+      background-color: #064b7a;
+      display: none;
+    }
+
+    .submenu div {
+      padding: 10px 40px;
+      font-size: 14px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .submenu div:hover {
+      background-color: rgba(255,255,255,0.15);
+    }
+
+    /* المحتوى */
+    .content {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      position: relative;
+    }
+
+    .header {
+      font-size: 22px;
+      color: #043B64;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .menu-toggle {
+      display: none;
+      font-size: 24px;
+      background: none;
+      border: none;
+      color: #043B64;
+      cursor: pointer;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .card:hover {
+      transform: translateY(-3px);
+    }
+
+    .card h3 {
+      color: #043B64;
+      margin: 0;
+    }
+
+    .card p {
+      color: #666;
+      margin: 10px 0 0;
+      font-weight: bold;
+      font-size: 15px;
+    }
+
+    .logout {
+      background: #FF6B2D;
+      border: none;
+      padding: 10px;
+      color: white;
+      border-radius: 6px;
+      margin: 15px;
+      cursor: pointer;
+    }
+
+    .logout:hover {
+      opacity: 0.9;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        right: 0;
+        transform: translateX(100%);
+      }
+
+      .sidebar.active {
+        transform: translateX(0);
+      }
+
+      .menu-toggle {
+        display: block;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- الشريط الجانبي -->
+  <div class="sidebar" id="sidebar">
+    <h2>نظام المراد ⚙️</h2>
+
+    <!-- 🟣 الطلبات -->
+    <div class="menu-item" onclick="toggleMenu('ordersMenu')">📦 الطلبات</div>
+    <div class="submenu" id="ordersMenu">
+      <div onclick="openOrders('')">الطلبات الجديدة</div>
+      <div onclick="openOrders('مثبت')">الطلبات المثبتة</div>
+      <div onclick="openOrders('قيد المعالجة')">قيد المعالجة</div>
+      <div onclick="openOrders('قيد التجهيز')">قيد التجهيز</div>
+      <div onclick="openOrders('قيد التوصيل')">قيد التوصيل</div>
+      <div onclick="openOrders('تم التسليم')">تم التسليم</div>
+      <div onclick="openOrders('راجع')">الطلبات الراجعة</div>
+      <div onclick="openOrders('رفض')">الطلبات المرفوضة</div>
+      <div style="background:#FF6B2D;color:white;font-weight:bold;text-align:center;cursor:pointer" onclick="openNewOrder()">➕ إضافة طلب جديد</div>
+    </div>
+
+    <!-- 🟢 الحسابات -->
+    <div class="menu-item" onclick="toggleMenu('financeMenu')">💰 الحسابات</div>
+    <div class="submenu" id="financeMenu">
+      <div>المبيعات</div>
+      <div>الأرباح</div>
+    </div>
+
+    <!-- 📊 الإحصائيات -->
+    <div class="menu-item" onclick="openStatistics()">📊 الإحصائيات</div>
+
+    <!-- 🚪 تسجيل الخروج -->
+    <button class="logout" onclick="logout()">🚪 تسجيل الخروج</button>
+  </div>
+
+  <!-- المحتوى -->
+  <div class="content">
+    <div class="header">
+      <span id="sectionTitle">لوحة التحكم الرئيسية</span>
+      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+    </div>
+
+    <div class="stats" id="statsContainer">
+      <div class="card" data-status=""><h3>الطلبات الجديدة</h3><p id="newCount">0</p></div>
+      <div class="card" data-status="مثبت"><h3>الطلبات المثبتة</h3><p id="fixedCount">0</p></div>
+      <div class="card" data-status="قيد المعالجة"><h3>قيد المعالجة</h3><p id="processingCount">0</p></div>
+      <div class="card" data-status="قيد التجهيز"><h3>قيد التجهيز</h3><p id="packingCount">0</p></div>
+      <div class="card" data-status="قيد التوصيل"><h3>قيد التوصيل</h3><p id="deliveringCount">0</p></div>
+      <div class="card" data-status="تم التسليم"><h3>تم التسليم</h3><p id="deliveredCount">0</p></div>
+      <div class="card" data-status="راجع"><h3>راجع</h3><p id="returnedCount">0</p></div>
+      <div class="card" data-status="رفض"><h3>رفض</h3><p id="rejectedCount">0</p></div>
+      <!-- 🟠 إضافة طلب جديد -->
+      <div class="card" id="card-add" style="background:#FF6B2D;color:white;">
+        <h3>➕ إضافة طلب جديد</h3>
+        <p>إنشاء طلب جديد</p>
+      </div>
+    </div>
+  </div>
+  
+
+  <!-- 🔹 سكربت -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+    import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDtEJYJrmyP45qS2da8Cuc6y6Jv5VD0Uhc",
+      authDomain: "almurad-system.firebaseapp.com",
+      databaseURL: "https://almurad-system-default-rtdb.firebaseio.com/",
+      projectId: "almurad-system",
+      storageBucket: "almurad-system.appspot.com",
+      messagingSenderId: "911755824405",
+      appId: "1:911755824405:web:2bfbd18ddcf038ca48ad1c"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    const user = localStorage.getItem("loggedInUser");
+    if (!user) window.location.href = "index.html";
+
+    // تحميل الإحصائيات السريعة
+    async function loadStats() {
+      const dbRef = ref(db);
+      const snapshot = await get(child(dbRef, "orders"));
+      if (!snapshot.exists()) return;
+
+      const ordersData = snapshot.val();
+      const orders = Object.values(ordersData);
+
+      const counts = {
+        "": 0,
+        "مثبت": 0,
+        "قيد المعالجة": 0,
+        "قيد التجهيز": 0,
+        "قيد التوصيل": 0,
+        "تم التسليم": 0,
+        "راجع": 0,
+        "رفض": 0
+      };
+
+      orders.forEach(o => {
+        const st = (o.status || "").trim();
+        if (counts.hasOwnProperty(st)) counts[st]++;
+        else if (!st) counts[""]++;
+      });
+
+      document.getElementById("newCount").textContent = counts[""];
+      document.getElementById("fixedCount").textContent = counts["مثبت"];
+      document.getElementById("processingCount").textContent = counts["قيد المعالجة"];
+      document.getElementById("packingCount").textContent = counts["قيد التجهيز"];
+      document.getElementById("deliveringCount").textContent = counts["قيد التوصيل"];
+      document.getElementById("deliveredCount").textContent = counts["تم التسليم"];
+      document.getElementById("returnedCount").textContent = counts["راجع"];
+      document.getElementById("rejectedCount").textContent = counts["رفض"];
+    }
+
+    function openOrders(status) {
+      window.location.href = `orders.html?status=${encodeURIComponent(status)}`;
+    }
+
+    function openNewOrder() {
+      window.location.href = "add-order.html";
+    }
+
+    function openStatistics() {
+      window.location.href = "statistics.html"; // ✅ فتح صفحة الإحصائيات مباشرة
+    }
+
+    function toggleMenu(id) {
+      const submenu = document.getElementById(id);
+      submenu.style.display = submenu.style.display === "block" ? "none" : "block";
+    }
+
+    function toggleSidebar() {
+      document.getElementById("sidebar").classList.toggle("active");
+    }
+
+    function logout() {
+      localStorage.removeItem("loggedInUser");
+      window.location.href = "index.html";
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      loadStats();
+
+      const cards = document.querySelectorAll(".card[data-status]");
+      cards.forEach(card => {
+        card.addEventListener("click", () => {
+          const status = card.getAttribute("data-status") || "";
+          openOrders(status);
+        });
+      });
+
+      const addBtn = document.getElementById("card-add");
+      if (addBtn) addBtn.addEventListener("click", openNewOrder);
+    });
+
+    window.toggleMenu = toggleMenu;
+    window.toggleSidebar = toggleSidebar;
+    window.openOrders = openOrders;
+    window.openNewOrder = openNewOrder;
+    window.openStatistics = openStatistics;
+    window.logout = logout;
+  </script>
+
+</body>
+</html>
