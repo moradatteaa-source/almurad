@@ -4,10 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>لوحة التحكم - نظام المراد</title>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+
   <style>
     body {
       margin: 0;
-      font-family: "Tahoma", Arial, sans-serif;
+font-family: 'Tajawal', sans-serif;
       display: flex;
       height: 100vh;
       background: #f8f9fb;
@@ -132,23 +134,34 @@
     }
 
     @media (max-width: 768px) {
-      .sidebar {
-        position: fixed;
-        top: 0;
-        bottom: 0;
-        right: 0;
-        transform: translateX(100%);
-      }
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    transform: translateX(100%);
+  }
 
-      .sidebar.active {
-        transform: translateX(0);
-      }
+  .sidebar.active {
+    transform: translateX(0);
+  }
 
-      .menu-toggle {
-        display: block;
-      }
-    }
-  </style>
+  .menu-toggle {
+    display: block;
+  }
+}
+
+/* ✅ الكود الجديد هنا */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+}
+
+p, div, span, button {
+  font-weight: 500;
+}
+
+</style>
+
 </head>
 <body>
 
@@ -179,6 +192,9 @@
 
     <!-- 📊 الإحصائيات -->
     <div class="menu-item" onclick="openStatistics()">📊 الإحصائيات</div>
+    <!-- 👥 إدارة المستخدمين (تظهر فقط للأدمن) -->
+<div class="menu-item" id="usersMenu" style="display:none;" onclick="openUsers()">👥 إدارة المستخدمين</div>
+
 
     <!-- 🚪 تسجيل الخروج -->
     <button class="logout" onclick="logout()">🚪 تسجيل الخروج</button>
@@ -186,10 +202,13 @@
 
   <!-- المحتوى -->
   <div class="content">
-    <div class="header">
-      <span id="sectionTitle">لوحة التحكم الرئيسية</span>
-      <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
-    </div>
+<div class="header">
+  <span id="sectionTitle">لوحة التحكم الرئيسية</span>
+  <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+</div>
+
+<span id="userDisplay" style="font-size:16px; color:#555;"></span>
+
 
     <div class="stats" id="statsContainer">
       <div class="card" data-status=""><h3>الطلبات الجديدة</h3><p id="newCount">0</p></div>
@@ -228,6 +247,11 @@
     const db = getDatabase(app);
 
     const user = localStorage.getItem("loggedInUser");
+    // ✅ عرض زر إدارة المستخدمين فقط إذا كان الأدمن
+if (user === "admin") {
+  document.getElementById("usersMenu").style.display = "block";
+}
+
     if (!user) window.location.href = "index.html";
 
     // تحميل الإحصائيات السريعة
@@ -306,6 +330,55 @@
       const addBtn = document.getElementById("card-add");
       if (addBtn) addBtn.addEventListener("click", openNewOrder);
     });
+// ✅ استرجاع المستخدم الحالي
+const loggedUser = JSON.parse(localStorage.getItem("loggedInUser"));
+if (!loggedUser) window.location.href = "index.html";
+
+// 👋 عرض الاسم
+document.getElementById("userDisplay").textContent = `👋 مرحباً، ${loggedUser.user || loggedUser.username}`;
+
+// 🧩 الصلاحيات
+const roles = loggedUser.roles || [];
+
+// 🎯 عناصر القائمة
+const ordersMenu   = document.querySelector(".menu-item[onclick*='ordersMenu']");
+const financeMenu  = document.querySelector(".menu-item[onclick*='financeMenu']");
+const statsMenu    = document.querySelector(".menu-item[onclick*='openStatistics']");
+const usersMenu    = document.getElementById("usersMenu");
+const storeMenu    = document.querySelector(".menu-item[onclick*='openStore']");
+const settingsMenu = document.querySelector(".menu-item[onclick*='openSettings']");
+
+// إخفاء الكل بالبداية
+if (ordersMenu) ordersMenu.style.display = "none";
+if (financeMenu) financeMenu.style.display = "none";
+if (statsMenu) statsMenu.style.display = "none";
+if (usersMenu) usersMenu.style.display = "none";
+if (storeMenu) storeMenu.style.display = "none";
+if (settingsMenu) settingsMenu.style.display = "none";
+
+// 🟢 الأقسام المفتوحة للجميع
+if (storeMenu) storeMenu.style.display = "block";      // إدارة المخزن
+if (settingsMenu) settingsMenu.style.display = "block"; // الإعدادات
+
+// 🟠 الأقسام حسب الصلاحيات
+if (roles.includes("admin")) {
+  if (ordersMenu) ordersMenu.style.display = "block";
+  if (financeMenu) financeMenu.style.display = "block";
+  if (statsMenu) statsMenu.style.display = "block";
+  if (usersMenu) usersMenu.style.display = "block";
+}
+if (roles.includes("stabilizer")) {
+  if (ordersMenu) ordersMenu.style.display = "block";
+}
+if (roles.includes("accountant")) {
+  if (financeMenu) financeMenu.style.display = "block";
+}
+if (roles.includes("delivery")) {
+  if (statsMenu) statsMenu.style.display = "block";
+}
+if (roles.includes("store")) {
+  if (ordersMenu) ordersMenu.style.display = "block";
+}
 
     window.toggleMenu = toggleMenu;
     window.toggleSidebar = toggleSidebar;
@@ -313,6 +386,76 @@
     window.openNewOrder = openNewOrder;
     window.openStatistics = openStatistics;
     window.logout = logout;
+    function openUsers() {
+  window.location.href = "users.html";
+}
+window.openUsers = function() {// 👋 عرض الاسم
+const loggedUser = JSON.parse(localStorage.getItem("loggedInUser"));
+if (loggedUser && loggedUser.user) {
+  document.getElementById("userDisplay").textContent = `👋 أهلاً ${loggedUser.user}!`;
+}
+  window.location.href = "users.html";
+};
+
+
+// ⚡ نظام العبارات التحفيزية اليومية (بدون مكتبة خارجية)
+function loadMotivationalQuote() {
+  const quotes = [
+    "ابدأ يومك بإيمانك بنفسك، فكل خطوة صغيرة نحو هدفك تقربك من النجاح الكبير.",
+    "حين تظن أن الطريق انتهى، تذكّر أن الناجحين صنعوا طريقهم عندما لم يجدوا طريقًا أصلًا.",
+    "لا تنتظر الظروف لتتحسن، بل كن أنت السبب في تحسينها. فالفرص تُخلق لا تُنتظر.",
+    "العمل الجاد اليوم هو ما يجعل غدك مختلفًا عن البقية. اجعل كل يوم خطوة نحو أحلامك.",
+    "النجاح لا يُقاس بما وصلت إليه، بل بما تغلبت عليه لتصل إلى هناك.",
+    "لا تخف من البدايات الصغيرة، فكل إنجاز عظيم بدأ بخطوة متواضعة وشغف لا ينطفئ.",
+    "الإنجاز لا يحتاج معجزة، فقط قلب لا يعرف الاستسلام وعقل يؤمن بالحلول.",
+    "التحديات ليست عوائق، بل فرص لتُظهر قوتك وقدرتك على التميز.",
+    "كن مثل النخلة، تُرمى بالحجارة فتعطي أطيب الثمار. اجعل صعوباتك دافعًا لا حاجزًا.",
+    "ما تزرعه من جهد اليوم، ستحصده غدًا نجاحًا يملأ حياتك فخرًا وسعادة.",
+    "لا تستهين بأي إنجاز، فكل خطوة نحو الأفضل هي نصرٌ على التردد والكسل.",
+    "كل صباح هو فرصة جديدة لتثبت أنك قادر على أن تكون أفضل من الأمس.",
+    "الثقة بالنفس لا تعني أنك الأفضل، بل أنك لا تقارن نفسك بأحد.",
+    "الطموح هو الوقود الذي يجعل الأيام الصعبة مجرد مراحل في طريق النجاح.",
+    "لا تنظر للقمم من بعيد، اصعد بخطوات ثابتة، وستصل عاجلاً أم آجلاً.",
+    "الفشل ليس عدوك، بل معلمك الذي يدفعك لتتعلم كيف تصل بشكلٍ أقوى."
+  ];
+
+  // 🧠 اختيار حكمة عشوائية
+  const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+
+  // 💾 حفظ آخر حكمة لعدم تكرارها مباشرة
+  localStorage.setItem("lastQuote", randomQuote);
+
+  // 🎨 إنشاء مربع العرض البرتقالي
+  const quoteBox = document.createElement("div");
+  quoteBox.innerHTML = `<strong>💬 ${randomQuote}</strong>`;
+  quoteBox.id = "quoteBox";
+  quoteBox.style.background = "#FF6B2D";
+  quoteBox.style.color = "white";
+  quoteBox.style.padding = "16px";
+  quoteBox.style.margin = "18px 0";
+  quoteBox.style.borderRadius = "10px";
+  quoteBox.style.textAlign = "center";
+  quoteBox.style.fontWeight = "bold";
+  quoteBox.style.fontSize = "16px";
+  quoteBox.style.lineHeight = "1.8";
+  quoteBox.style.direction = "rtl";
+  quoteBox.style.boxShadow = "0 3px 10px rgba(0,0,0,0.15)";
+  quoteBox.style.animation = "fadeIn 1.5s ease";
+  quoteBox.style.transition = "transform 0.8s ease";
+  quoteBox.style.transform = "translateY(10px)";
+  setTimeout(() => (quoteBox.style.transform = "translateY(0)"), 100);
+
+  const header = document.getElementById("userDisplay");
+  if (header) {
+    const old = document.getElementById("quoteBox");
+    if (old) old.remove();
+    header.after(quoteBox);
+  }
+}
+
+// 🚀 تنفيذ تلقائي عند الدخول للوحة التحكم
+loadMotivationalQuote();
+
   </script>
 
 </body>
