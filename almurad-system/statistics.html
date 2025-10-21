@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📊 الإحصائيات الكاملة - نظام المراد</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family:"Tahoma",Arial; background:#f5f6fa; margin:0; padding:0; }
+    header { background:#043B64; color:white; text-align:center; padding:12px; font-size:18px; }
+    .container { padding:20px; }
+    .back-btn { background:#FF6B2D; color:white; border:none; padding:8px 15px; border-radius:6px; cursor:pointer; margin-bottom:20px; }
+    .filters { margin-bottom:20px; }
+    .filters label { margin-right:10px; font-weight:bold; color:#043B64; }
+    .section { margin-bottom:40px; }
+    .section h2 { color:#043B64; border-bottom:2px solid #043B64; padding-bottom:5px; margin-bottom:15px; }
+    .stats-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; }
+    .stat-card { background:white; border-radius:10px; padding:15px; box-shadow:0 2px 8px rgba(0,0,0,0.05); text-align:center; }
+    .stat-card h3 { margin:0; color:#043B64; }
+    .stat-card p { margin:10px 0 0; font-size:16px; font-weight:bold; color:#333; }
+    canvas { background:white; border-radius:10px; padding:10px; margin-top:15px; box-shadow:0 2px 8px rgba(0,0,0,0.05); width:100% !important; height:auto !important; }
+  </style>
+</head>
+<body>
+  <header>📊 الإحصائيات والتحليلات الكاملة</header>
+  <div class="container">
+    <button class="back-btn" onclick="window.location.href='dashboard.html'">🔙 رجوع إلى لوحة التحكم</button>
+
+    <div class="filters">
+      <label>اختر الفترة الزمنية:</label>
+      <select id="periodSelect">
+        <option value="day">اليوم</option>
+        <option value="week">الأسبوع</option>
+        <option value="month" selected>الشهر</option>
+        <option value="all">الكل</option>
+      </select>
+    </div>
+
+    <!-- 📋 الإحصائيات العامة -->
+    <div class="section">
+      <h2>📋 الإحصائيات العامة للطلبات</h2>
+      <div class="stats-grid">
+        <div class="stat-card"><h3>عدد الطلبات الكلي</h3><p id="stat_totalOrders">0</p></div>
+        <div class="stat-card"><h3>طلبات جديدة</h3><p id="stat_newOrders">0</p></div>
+        <div class="stat-card"><h3>طلبات مثبّتة</h3><p id="stat_fixedOrders">0</p></div>
+        <div class="stat-card"><h3>في التجهيز</h3><p id="stat_packingOrders">0</p></div>
+        <div class="stat-card"><h3>قيد التوصيل</h3><p id="stat_deliveringOrders">0</p></div>
+        <div class="stat-card"><h3>تم التسليم</h3><p id="stat_completedOrders">0</p></div>
+        <div class="stat-card"><h3>الطلبات الراجعة</h3><p id="stat_returnedOrders">0</p></div>
+        <div class="stat-card"><h3>المرفوضة</h3><p id="stat_rejectedOrders">0</p></div>
+      </div>
+    </div>
+
+    <!-- 💰 المؤشرات المالية -->
+    <div class="section">
+      <h2>💰 المؤشرات المالية (تم التسليم فقط)</h2>
+      <div class="stats-grid">
+        <div class="stat-card"><h3>إجمالي مبلغ الطلبات المسلّمة</h3><p id="stat_totalSales">0 د.ع</p></div>
+        <div class="stat-card"><h3>إجمالي مبلغ التوصيل</h3><p id="stat_totalDelivery">0 د.ع</p></div>
+        <div class="stat-card"><h3>إجمالي عدد القطع</h3><p id="stat_totalQuantity">0</p></div>
+        <div class="stat-card"><h3>صافي الربح</h3><p id="stat_netProfit">0 د.ع</p></div>
+        <div class="stat-card"><h3>نسبة الإرجاع</h3><p id="stat_returnRate">0%</p></div>
+        <div class="stat-card"><h3>متوسط الطلب</h3><p id="stat_avgOrder">0 د.ع</p></div>
+      </div>
+    </div>
+
+    <!-- 📈 الرسوم البيانية -->
+    <div class="section"><h2>📈 تطور الطلبات والأرباح</h2><canvas id="chartSalesProfit"></canvas></div>
+    <div class="section"><h2>📦 أكثر 10 منتجات مبيعة</h2><canvas id="chartTopProducts"></canvas></div>
+    <div class="section"><h2>⚠️ أكثر 10 منتجات راجعة</h2><canvas id="chartTopReturns"></canvas></div>
+    <div class="section"><h2>📊 توزيع حالات الطلبات</h2><canvas id="chartStatuses"></canvas></div>
+
+    <!-- 💡 نصائح -->
+    <div class="section">
+      <h2>💡 نصائح واقتراحات للنمو</h2>
+      <div id="tipsContainer"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+    import { getDatabase, ref, get, child } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+    import "https://cdn.jsdelivr.net/npm/chart.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDtEJYJrmyP45qS2da8Cuc6y6Jv5VD0Uhc",
+      authDomain: "almurad-system.firebaseapp.com",
+      databaseURL: "https://almurad-system-default-rtdb.firebaseio.com/",
+      projectId: "almurad-system",
+      storageBucket: "almurad-system.appspot.com",
+      messagingSenderId: "911755824405",
+      appId: "1:911755824405:web:2bfbd18ddcf038ca48ad1c"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    let charts = {};
+
+    async function loadStatistics(period = "month") {
+      const snapshot = await get(child(ref(db), "orders"));
+      if (!snapshot.exists()) return;
+      const orders = Object.values(snapshot.val());
+
+      const statusCount = {"":0,"مثبت":0,"قيد المعالجة":0,"قيد التجهيز":0,"قيد التوصيل":0,"تم التسليم":0,"راجع":0,"رفض":0};
+      const dailySales = {}, dailyProfit = {}, productSales = {}, productReturns = {};
+
+      let deliveredOrders = 0, deliveredAmount = 0, deliveredQuantity = 0;
+
+      const now = new Date();
+      let start = new Date();
+      if (period === "day") start.setDate(now.getDate() - 1);
+      else if (period === "week") start.setDate(now.getDate() - 7);
+      else if (period === "month") start.setMonth(now.getMonth() - 1);
+      else start = new Date(0);
+
+      orders.forEach(o => {
+        const st = (o.status || "").trim();
+        if (statusCount.hasOwnProperty(st)) statusCount[st]++;
+        const dateObj = o.orderDate ? new Date(o.orderDate) : now;
+        if (dateObj < start) return;
+
+        const price = parseFloat(o.price || 0);
+        const qty = parseInt(o.quantity || 0);
+        const prod = (o.productName || o.product || "غير معروف").trim();
+
+        if (st === "تم التسليم") {
+          deliveredOrders++;
+          deliveredAmount += price;
+          deliveredQuantity += qty;
+        }
+
+        const dayKey = dateObj.toISOString().split("T")[0];
+        dailySales[dayKey] = (dailySales[dayKey] || 0) + price;
+        dailyProfit[dayKey] = (dailyProfit[dayKey] || 0) + (price - 4000);
+
+        if (st === "راجع") productReturns[prod] = (productReturns[prod] || 0) + qty;
+        else productSales[prod] = (productSales[prod] || 0) + qty;
+      });
+
+      const returnCount = statusCount["راجع"] || 0;
+      const returnRate = deliveredOrders > 0 ? ((returnCount / deliveredOrders) * 100).toFixed(2) : "0.00";
+      const totalDeliveryCost = deliveredOrders * 4000;
+      const netProfit = deliveredAmount - totalDeliveryCost;
+      const avgOrder = deliveredOrders > 0 ? (deliveredAmount / deliveredOrders).toFixed(2) : 0;
+
+      // ✅ تحديث البيانات النصية
+      document.getElementById("stat_totalOrders").textContent = orders.length;
+      document.getElementById("stat_newOrders").textContent = statusCount[""];
+      document.getElementById("stat_fixedOrders").textContent = statusCount["مثبت"];
+      document.getElementById("stat_packingOrders").textContent = statusCount["قيد التجهيز"];
+      document.getElementById("stat_deliveringOrders").textContent = statusCount["قيد التوصيل"];
+      document.getElementById("stat_completedOrders").textContent = statusCount["تم التسليم"];
+      document.getElementById("stat_returnedOrders").textContent = statusCount["راجع"];
+      document.getElementById("stat_rejectedOrders").textContent = statusCount["رفض"];
+
+      document.getElementById("stat_totalSales").textContent = deliveredAmount.toLocaleString() + " د.ع";
+      document.getElementById("stat_totalDelivery").textContent = totalDeliveryCost.toLocaleString() + " د.ع";
+      document.getElementById("stat_totalQuantity").textContent = deliveredQuantity;
+      document.getElementById("stat_netProfit").textContent = netProfit.toLocaleString() + " د.ع";
+      document.getElementById("stat_returnRate").textContent = returnRate + "%";
+      document.getElementById("stat_avgOrder").textContent = avgOrder + " د.ع";
+
+      // ✅ الرسوم البيانية
+      const ctx1 = document.getElementById("chartSalesProfit").getContext("2d");
+      if (charts.salesProfit) charts.salesProfit.destroy();
+      charts.salesProfit = new Chart(ctx1, {
+        type: "line",
+        data: {
+          labels: Object.keys(dailySales),
+          datasets: [
+            { label: "💵 المبيعات", data: Object.values(dailySales), borderColor: "#043B64", fill: false },
+            { label: "📈 الأرباح", data: Object.values(dailyProfit), borderColor: "#FF6B2D", fill: false }
+          ]
+        },
+        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+      });
+
+      const arrSales = Object.entries(productSales).sort((a,b)=>b[1]-a[1]).slice(0,10);
+      const arrReturns = Object.entries(productReturns).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+      const ctx2 = document.getElementById("chartTopProducts").getContext("2d");
+      if (charts.topProducts) charts.topProducts.destroy();
+      charts.topProducts = new Chart(ctx2, {
+        type: "bar",
+        data: { labels: arrSales.map(i=>i[0]), datasets: [{ label:"كمية المبيعات", data: arrSales.map(i=>i[1]), backgroundColor:"#043B64" }] },
+        options: { plugins:{legend:{display:false}} }
+      });
+
+      const ctx3 = document.getElementById("chartTopReturns").getContext("2d");
+      if (charts.topReturns) charts.topReturns.destroy();
+      charts.topReturns = new Chart(ctx3, {
+        type: "bar",
+        data: { labels: arrReturns.map(i=>i[0]), datasets: [{ label:"كمية الإرجاع", data: arrReturns.map(i=>i[1]), backgroundColor:"#d93025" }] },
+        options: { plugins:{legend:{display:false}} }
+      });
+
+      const ctx4 = document.getElementById("chartStatuses").getContext("2d");
+      if (charts.statuses) charts.statuses.destroy();
+      charts.statuses = new Chart(ctx4, {
+        type: "doughnut",
+        data: { labels: Object.keys(statusCount), datasets: [{ data: Object.values(statusCount), backgroundColor: ["#6C757D","#0D6EFD","#198754","#FFC107","#17A2B8","#28A745","#DC3545","#6F42C1"] }] },
+        options: { plugins: { legend: { position: "right" } } }
+      });
+
+      // ✅ النصائح الذكية
+      const tips = [];
+      if (parseFloat(returnRate) > 5) tips.push("⚠️ نسبة الإرجاع مرتفعة — راجع جودة المنتجات والتغليف.");
+      if (netProfit < 0) tips.push("🚨 صافي الربح بالسالب — تأكد من تكلفة الشحن أو الأسعار.");
+      if (avgOrder < 10000) tips.push("💡 متوسط الطلب منخفض — فكّر بعروض لتشجيع الطلبات الكبيرة.");
+      if (arrSales[0]) tips.push(`🔥 المنتج الأكثر مبيعًا: ${arrSales[0][0]} (${arrSales[0][1]} قطعة).`);
+
+      const tipContainer = document.getElementById("tipsContainer");
+      tipContainer.innerHTML = "";
+      tips.forEach(t => {
+        const div = document.createElement("div");
+        div.textContent = "• " + t;
+        tipContainer.appendChild(div);
+      });
+    }
+
+    document.getElementById("periodSelect").addEventListener("change", e => loadStatistics(e.target.value));
+    document.addEventListener("DOMContentLoaded", ()=> loadStatistics("month"));
+  </script>
+</body>
+</html>
