@@ -89,6 +89,17 @@ app.post("/api/get-orders-status", async (req, res) => {
     res.status(500).json({ status: false, msg: "Server Error in get-orders-status" });
   }
 });
+// ✅ جلب الـ IP العام للسيرفر (مطلوب من الوسيط)
+app.get("/myip", async (req, res) => {
+  try {
+    const response = await fetch("https://ifconfig.me");
+    const ip = await response.text();
+    res.send(`🌍 Server Public IP: ${ip}`);
+  } catch (err) {
+    console.error("❌ Error fetching IP:", err);
+    res.status(500).send("Error fetching IP");
+  }
+});
 
 
 app.listen(process.env.PORT || 3000, () => 
