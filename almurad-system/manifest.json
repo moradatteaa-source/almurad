@@ -1,18 +1,18 @@
 {
   "name": "نظام المراد",
-  "short_name": "المراد",
-  "start_url": "/",
+  "short_name": "نظام المراد",
+  "start_url": "/almurad-system/",
   "display": "standalone",
   "background_color": "#043B64",
   "theme_color": "#043B64",
   "icons": [
     {
-      "src": "almurad-logo.png",
+      "src": "almurad-system/almurad-logo.png",
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "almurad-logo.png",
+      "src": "almurad-system/almurad-logo.png",
       "sizes": "512x512",
       "type": "image/png"
     }
