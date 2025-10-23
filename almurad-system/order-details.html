@@ -372,7 +372,16 @@ input, select, textarea {
 
       const phone = data.phone1 || "";
       document.getElementById("callBtn").href = `tel:${phone}`;
-      document.getElementById("whatsappBtn").href = `https://wa.me/${phone.replace(/^0/, "964")}`;
+let normalizedPhone = phone.toString().trim()
+  .replace(/[^\d]/g, '')
+  .replace(/^0+/, '');
+
+if (!normalizedPhone.startsWith('964'))
+  normalizedPhone = '964' + normalizedPhone;
+
+document.getElementById("whatsappBtn").onclick = () => {
+  window.open(`https://wa.me/${normalizedPhone}`, "_blank");
+};
 
       const cityDiv = document.getElementById("city");
       const areaDiv = document.getElementById("area");
@@ -394,7 +403,17 @@ input, select, textarea {
       productDiv.appendChild(productDropdown);
 
       const statusDiv = document.getElementById("status");
-      const statusOptions = ["", "مثبت", "قيد المعالجة", "قيد التجهيز", "قيد التوصيل", "تم التسليم", "راجع", "رفض"];
+const statusOptions = [
+  "",
+  "مثبت",
+  "قيد المعالجة",
+  "قيد التجهيز",
+  "بانتظار البضاعة",
+  "قيد التوصيل",
+  "تم التسليم",
+  "راجع",
+  "رفض"
+];
       const statusDropdown = createDropdown(statusOptions, data.status || "", val => update(ref(db, `orders/${orderId}`), { status: val }));
       statusDiv.appendChild(statusDropdown);
     }
@@ -414,8 +433,12 @@ input, select, textarea {
       window.location.href = "orders.html";
     });
 
-    document.getElementById("backBtn").addEventListener("click", () => window.location.href = "orders.html");
+    document.getElementById("backBtn").addEventListener("click", () => {
+  window.parent.postMessage("closeDetailsModal", "*");
+});
+
     await loadOrder();
+    
   </script>
 </body>
 </html>

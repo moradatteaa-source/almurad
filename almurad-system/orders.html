@@ -187,14 +187,14 @@ input, select, textarea {
       </tbody>
     </table>
   </div>
+<script type="module">
+  import { waseetCities } from "./waseetCities.js";
+  import { waseetRegions } from "./waseetRegions.js";
+  import { citiesData, allCities } from "./citiesData.js";
 
-  <script type="module">
-    import { waseetCities } from "./waseetCities.js";
-import { waseetRegions } from "./waseetRegions.js";
-
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-    import { getDatabase, ref, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
-    import { citiesData, allCities } from "./citiesData.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getDatabase, ref, onValue, update, remove, get } 
+    from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDtEJYJrmyP45qS2da8Cuc6y6Jv5VD0Uhc",
@@ -206,10 +206,14 @@ import { waseetRegions } from "./waseetRegions.js";
       appId: "1:911755824405:web:2bfbd18ddcf038ca48ad1c"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const ordersBody = document.getElementById("ordersBody");
-    const searchInput = document.getElementById("searchInput");
+   const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const ordersBody = document.getElementById("ordersBody");
+const searchInput = document.getElementById("searchInput");
+
+// 🔹 نضيف هذا السطر هنا
+const currentUser = sessionStorage.getItem("userName") || "غير معروف";
+
 
     let allProducts = [];
     let allOrders = [];
@@ -348,10 +352,22 @@ import { waseetRegions } from "./waseetRegions.js";
         const detailsBtn = document.createElement("button");
         detailsBtn.textContent = "🔍 تفاصيل";
         detailsBtn.style.background = "#FF6B2D";
-        detailsBtn.addEventListener("click", () => {
-          localStorage.setItem("selectedOrder", order.id);
-          window.location.href = "order-details.html";
-        });
+detailsBtn.addEventListener("click", () => {
+  const modal = document.getElementById("detailsModal");
+  const frame = document.getElementById("detailsFrame");
+  localStorage.setItem("selectedOrder", order.id);
+  frame.src = "order-details.html"; // نستخدم نفس الصفحة الأصلية
+  modal.style.display = "block";
+
+  // السماح بإغلاقها بزر رجوع
+  window.addEventListener("message", (e) => {
+    if (e.data === "closeDetailsModal") {
+      modal.style.display = "none";
+      frame.src = "";
+    }
+  });
+});
+
         detailsTd.appendChild(detailsBtn);
         tr.appendChild(detailsTd);
 
@@ -369,19 +385,37 @@ import { waseetRegions } from "./waseetRegions.js";
           { val: order.notes, textarea: true, fn: v => update(ref(db, `orders/${order.id}`), { notes: v }) },
           { val: order.receiptNum, fn: v => update(ref(db, `orders/${order.id}`), { receiptNum: v }) },
           {
-            val: order.status || "",
-            dropdown: ["", "مثبت", "قيد المعالجة", "قيد التجهيز", "قيد التوصيل", "تم التسليم", "راجع", "رفض"],
-            fn: v => {
-              update(ref(db, `orders/${order.id}`), { status: v }).then(() => {
-                // إخفاء الطلب فوريًا عند تغيّر الحالة
-                const st = (v || "").trim();
-                const shouldHide =
-                  (currentStatus === "" && st !== "") ||
-                  (currentStatus !== "" && st !== currentStatus);
-                if (shouldHide) tr.remove();
-              });
-            }
-          },
+           
+  val: order.status || "",
+  dropdown: ["", "مثبت", "قيد المعالجة", "قيد التجهيز", "بانتظار البضاعة", "قيد التوصيل", "تم التسليم", "راجع", "رفض"],
+  fn: async (newStatus) => {
+const userName = currentUser;
+    const orderRef = ref(db, `orders/${order.id}`);
+
+    // جلب الطلب الحالي
+    const snap = await get(orderRef);
+    const existing = snap.exists() ? snap.val() : {};
+
+    // تحديث الطلب بالاسم والتاريخ
+    await update(orderRef, {
+      status: newStatus,
+      updatedBy: userName,
+      updatedAt: new Date().toISOString(),
+fixedBy:
+  (existing.fixedBy && existing.fixedBy !== "غير معروف")
+    ? existing.fixedBy
+    : ((newStatus === "مثبت" || newStatus === "رفض") ? userName : existing.fixedBy || userName)
+    });
+
+    // إزالة الطلب من الصفحة إذا خرج من الفلترة الحالية
+    const st = (newStatus || "").trim();
+    const shouldHide =
+      (currentStatus === "" && st !== "") ||
+      (currentStatus !== "" && st !== currentStatus);
+    if (shouldHide) tr.remove();
+  }
+}
+,
           { val: order.orderDate || "-", readonly: true },
           { val: order.advertiser, fn: v => update(ref(db, `orders/${order.id}`), { advertiser: v }) }
         ];
@@ -706,8 +740,69 @@ document.getElementById("updateStatuses").addEventListener("click", async () => 
     showMsg("❌ حدث خطأ أثناء تحديث الحالات.", "#b30000");
   }
 });
+// ✅ نافذة منبثقة لعرض تفاصيل الطلب بدون تحميل صفحة جديدة
+function openOrderDetailsInline(order) {
+  const overlay = document.createElement("div");
+  Object.assign(overlay.style, {
+    position: "fixed",
+    top: "0", left: "0", right: "0", bottom: "0",
+    background: "rgba(0,0,0,0.4)",
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: "999999"
+  });
+
+  const box = document.createElement("div");
+  Object.assign(box.style, {
+    background: "white",
+    borderRadius: "10px",
+    padding: "20px",
+    width: "90%",
+    maxWidth: "600px",
+    maxHeight: "90%",
+    overflowY: "auto",
+    direction: "rtl",
+    textAlign: "right"
+  });
+
+  box.innerHTML = `
+    <h3 style="text-align:center;color:#043B64;margin-top:0;">📋 تفاصيل الطلب</h3>
+    <p><b>الكود:</b> ${order.code || "-"}</p>
+    <p><b>المنتج:</b> ${order.productName || "-"}</p>
+    <p><b>المدينة:</b> ${order.city || "-"}</p>
+    <p><b>المنطقة:</b> ${order.area || "-"}</p>
+    <p><b>العنوان:</b> ${order.address || "-"}</p>
+    <p><b>السعر:</b> ${order.price || "-"}</p>
+    <p><b>الكمية:</b> ${order.quantity || "-"}</p>
+    <p><b>الملاحظات:</b> ${order.notes || "-"}</p>
+    <p><b>رقم الهاتف:</b> ${order.phone1 || "-"}</p>
+    <p><b>الحالة:</b> ${order.status || "-"}</p>
+    <p><b>المعلن:</b> ${order.advertiser || "-"}</p>
+    <div style="text-align:center;margin-top:20px;">
+      <button id="closeOrderModal" style="background:#043B64;color:white;padding:10px 20px;border:none;border-radius:8px;cursor:pointer;">إغلاق</button>
+    </div>
+  `;
+
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+
+  document.getElementById("closeOrderModal").addEventListener("click", () => overlay.remove());
+}
+
+
 
   </script>
+  <!-- ✅ نافذة تفاصيل الطلب الكاملة (منسوخة من صفحة التفاصيل) -->
+  <div id="detailsModal" style="display:none;">
+    <iframe id="detailsFrame" style="
+      position:fixed;
+      top:0; left:0;
+      width:100%; height:100%;
+      border:none;
+      z-index:999999;
+    "></iframe>
+  </div>
 
 </body>
-</html> 
+</html>

@@ -180,6 +180,8 @@ p, div, span, button {
       <div onclick="openOrders('تم التسليم')">تم التسليم</div>
       <div onclick="openOrders('راجع')">الطلبات الراجعة</div>
       <div onclick="openOrders('رفض')">الطلبات المرفوضة</div>
+      <div onclick="openOrders('بانتظار البضاعة')">بانتظار البضاعة</div>
+
       <div style="background:#FF6B2D;color:white;font-weight:bold;text-align:center;cursor:pointer" onclick="openNewOrder()">➕ إضافة طلب جديد</div>
     </div>
 
@@ -191,7 +193,15 @@ p, div, span, button {
     </div>
 
     <!-- 📊 الإحصائيات -->
-    <div class="menu-item" onclick="openStatistics()">📊 الإحصائيات</div>
+<!-- 📊 الإحصائيات -->
+<div class="menu-item" onclick="toggleMenu('statsMenu')">📊 الإحصائيات</div>
+<div class="submenu" id="statsMenu">
+  <div onclick="openStatistics('orders')">إحصائيات الطلبات</div>
+  <div onclick="openStatistics('employees')">إحصائيات الموظفين</div>
+  <div onclick="openStatistics('products')">إحصائيات المنتجات</div>
+  <div onclick="openStatistics('advertisers')">إحصائيات المعلنين</div>
+  <div onclick="openStatistics('daily')">الإحصائيات اليومية</div>
+</div>
     <!-- 👥 إدارة المستخدمين (تظهر فقط للأدمن) -->
 <div class="menu-item" id="usersMenu" style="display:none;" onclick="openUsers()">👥 إدارة المستخدمين</div>
 
@@ -219,6 +229,11 @@ p, div, span, button {
       <div class="card" data-status="تم التسليم"><h3>تم التسليم</h3><p id="deliveredCount">0</p></div>
       <div class="card" data-status="راجع"><h3>راجع</h3><p id="returnedCount">0</p></div>
       <div class="card" data-status="رفض"><h3>رفض</h3><p id="rejectedCount">0</p></div>
+      <div class="card" data-status="بانتظار البضاعة">
+  <h3>بانتظار البضاعة</h3>
+  <p id="waitingCount">0</p>
+</div>
+
       <!-- 🟠 إضافة طلب جديد -->
       <div class="card" id="card-add" style="background:#FF6B2D;color:white;">
         <h3>➕ إضافة طلب جديد</h3>
@@ -263,16 +278,17 @@ if (user === "admin") {
       const ordersData = snapshot.val();
       const orders = Object.values(ordersData);
 
-      const counts = {
-        "": 0,
-        "مثبت": 0,
-        "قيد المعالجة": 0,
-        "قيد التجهيز": 0,
-        "قيد التوصيل": 0,
-        "تم التسليم": 0,
-        "راجع": 0,
-        "رفض": 0
-      };
+     const counts = {
+  "": 0,
+  "مثبت": 0,
+  "قيد المعالجة": 0,
+  "قيد التجهيز": 0,
+  "بانتظار البضاعة": 0,
+  "قيد التوصيل": 0,
+  "تم التسليم": 0,
+  "راجع": 0,
+  "رفض": 0
+};
 
       orders.forEach(o => {
         const st = (o.status || "").trim();
@@ -288,6 +304,8 @@ if (user === "admin") {
       document.getElementById("deliveredCount").textContent = counts["تم التسليم"];
       document.getElementById("returnedCount").textContent = counts["راجع"];
       document.getElementById("rejectedCount").textContent = counts["رفض"];
+      document.getElementById("waitingCount").textContent = counts["بانتظار البضاعة"];
+
     }
 
     function openOrders(status) {
@@ -298,9 +316,16 @@ if (user === "admin") {
       window.location.href = "add-order.html";
     }
 
-    function openStatistics() {
-      window.location.href = "statistics.html"; // ✅ فتح صفحة الإحصائيات مباشرة
-    }
+ function openStatistics(tab) {
+  if (tab === "employees") {
+    window.location.href = "stats-employees.html"; // ✅ الاسم الصحيح حسب الموجود فعلاً
+  } else {
+    window.location.href = `statistics.html?tab=${tab}`;
+  }
+}
+
+
+
 
     function toggleMenu(id) {
       const submenu = document.getElementById(id);
@@ -452,9 +477,9 @@ function loadMotivationalQuote() {
     header.after(quoteBox);
   }
 }
-
 // 🚀 تنفيذ تلقائي عند الدخول للوحة التحكم
 loadMotivationalQuote();
+
 
   </script>
 

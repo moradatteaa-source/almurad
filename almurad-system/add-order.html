@@ -1,212 +1,391 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>➕ إضافة طلب جديد - نظام المراد</title>
   <style>
-    body {font-family: Tahoma, Arial; background: #f4f6fa; margin: 0;}
-    header {background: #043B64; color: white; text-align: center; padding: 15px; font-size: 20px;}
+    :root {
+      --main-blue: #043B64;
+      --accent-orange: #FF6B2D;
+      --background-gray: #f2f3f5;
+      --border-radius: 12px;
+    }
+
+    body {
+      font-family: Tahoma, Arial;
+      background: var(--background-gray);
+      margin: 0;
+      padding: 0;
+      color: #333;
+    }
+
+    header {
+      background: var(--main-blue);
+      color: white;
+      text-align: center;
+      padding: 15px;
+      font-size: 18px;
+      letter-spacing: 0.5px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    }
+
     .container {
-      max-width: 800px; margin: 30px auto; background: white;
-      border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); padding: 25px;
+      max-width: 800px;
+      margin: 25px auto;
+      padding: 10px;
     }
-    .row {display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap;}
-    .field {flex: 1; min-width: 230px; display: flex; flex-direction: column;}
-    label {font-weight: bold; margin-bottom: 4px; color: #043B64;}
-    input, textarea, select {
-      padding: 8px; border: 1px solid #ccc; border-radius: 6px;
-      font-size: 14px; width: 100%;
+
+    .card {
+      background: var(--background-gray);
+      border-radius: var(--border-radius);
+      padding: 15px 20px;
+      margin-bottom: 15px;
     }
-    textarea {resize: vertical; height: 70px;}
+
+    .row {
+      display: flex;
+      justify-content: center;
+      gap: 25px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .field {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .field.small {
+      flex: none;
+      width: 140px;
+    }
+
+    .field.single {
+      max-width: 280px;
+      margin: 0 auto 15px auto;
+    }
+
+    label {
+      color: var(--main-blue);
+      font-weight: 600;
+      margin-bottom: 5px;
+      font-size: 13px;
+    }
+
+    input, textarea {
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 9px 10px;
+      font-size: 13px;
+      width: 100%;
+      background: #fff;
+      transition: all 0.2s;
+    }
+
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent-orange);
+      box-shadow: 0 0 4px rgba(255,107,45,0.3);
+    }
+
+    textarea {
+      resize: vertical;
+      height: 60px;
+    }
+
     button {
-      background: #FF6B2D; color: white; border: none; border-radius: 8px;
-      padding: 10px 20px; cursor: pointer; font-size: 15px; margin-top: 15px;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 16px;
+      width: 100%;
+      font-size: 14px;
+      cursor: pointer;
+      margin-top: 10px;
+      font-weight: bold;
+      transition: all 0.2s;
     }
-    button:hover {opacity: 0.9;}
-    #savedMsg {color: green; font-size: 13px; margin-top: 5px; display: none;}
-    .dropdown-input {position: relative;}
-    .dropdown-list {
-      position: absolute; top: 100%; right: 0; width: 100%;
-      background: #fff; border: 1px solid #ccc; border-radius: 6px;
-      max-height: 180px; overflow-y: auto; z-index: 1000; display: none;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+
+    #saveBtn {
+      background: var(--accent-orange);
+      color: white;
     }
-    .dropdown-item {
-      padding: 6px 8px; cursor: pointer; font-size: 13px;
+
+    #backBtn {
+      background: var(--main-blue);
+      color: white;
     }
-    .dropdown-item:hover {background: #f0f0f0;}
+
+    #saveBtn:hover, #backBtn:hover {
+      opacity: 0.9;
+      transform: scale(1.01);
+    }
+
+    #savedMsg {
+      text-align: center;
+      color: green;
+      font-weight: bold;
+      margin-top: 10px;
+      display: none;
+    }
+
+    @media (max-width: 600px) {
+      .container { margin: 10px; }
+      .card { padding: 10px; }
+      .field.small { width: 130px; }
+      .field.single { max-width: 100%; }
+    }
+
+    /* منع تكبير النص بالموبايل */
+    input, select, textarea { font-size: 16px !important; }
   </style>
 </head>
-<body>
 
+<body>
   <header>➕ إضافة طلب جديد - نظام المراد</header>
 
   <div class="container">
-    <div class="row">
-      <div class="field"><label>الكود:</label><input id="code" type="text"></div>
-      <div class="field"><label>رقم الموبايل:</label><input id="phone" type="text"></div>
-      <div class="field"><label>الرقم الثاني:</label><input id="phone2" type="text"></div>
-    </div>
-
-    <div class="row">
-      <div class="field"><label>المحافظة:</label><div id="city"></div></div>
-      <div class="field"><label>المنطقة:</label><div id="area"></div></div>
-    </div>
-
-    <div class="field"><label>العنوان الكامل:</label><textarea id="address"></textarea></div>
-
-    <div class="row">
-      <div class="field"><label>السعر:</label><input id="price" type="number"></div>
-      <div class="field"><label>عدد القطع:</label><input id="qty" type="number"></div>
-    </div>
-
-    <div class="field"><label>اسم المنتج:</label><div id="product"></div></div>
-    <div class="field"><label>الملاحظات:</label><textarea id="note"></textarea></div>
-
-    <div class="row">
-      <div class="field">
-        <label>الحالة:</label>
-        <select id="status">
-          <option value="">جديد</option>
-          <option>مثبت</option>
-          <option>قيد المعالجة</option>
-          <option>قيد التجهيز</option>
-          <option>قيد التوصيل</option>
-          <option>تم التسليم</option>
-          <option>راجع</option>
-          <option>رفض</option>
-        </select>
+    <div class="card">
+      <div class="field single">
+        <label>الكود:</label>
+        <input id="code" type="text">
       </div>
-      <div class="field"><label>المعلن:</label><input id="advertiser" type="text"></div>
     </div>
 
-    <div id="savedMsg">✅ تم إضافة الطلب بنجاح</div>
+    <div class="card">
+      <div class="row">
+        <div class="field small">
+          <label>رقم الهاتف الأول:</label>
+          <input id="phone1" type="text">
+        </div>
+        <div class="field small">
+          <label>الرقم الثاني:</label>
+          <input id="phone2" type="text">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="field small">
+          <label>المحافظة:</label>
+          <div id="city"></div>
+        </div>
+        <div class="field small">
+          <label>المنطقة:</label>
+          <div id="area"></div>
+        </div>
+      </div>
+      <div class="field single">
+        <label>العنوان الكامل:</label>
+        <textarea id="address"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="field small">
+          <label>السعر:</label>
+          <input id="price" type="number">
+        </div>
+        <div class="field small">
+          <label>عدد القطع:</label>
+          <input id="quantity" type="number">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="field single">
+        <label>اسم المنتج:</label>
+        <div id="product"></div>
+      </div>
+      <div class="field single">
+        <label>الملاحظات:</label>
+        <textarea id="notes"></textarea>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div class="field small">
+          <label>الحالة:</label>
+          <div id="status"></div>
+        </div>
+        <div class="field small">
+          <label>المعلن:</label>
+          <input id="advertiser" type="text">
+        </div>
+      </div>
+    </div>
+
     <button id="saveBtn">💾 حفظ الطلب</button>
-    <button id="backBtn" style="background:#043B64;">🔙 رجوع</button>
+    <button id="backBtn">🔙 رجوع</button>
+    <div id="savedMsg">✅ تم حفظ الطلب بنجاح</div>
   </div>
 
+  <!-- سكربت الفايربيس -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+    import { getDatabase, ref, push, set, get, child, onValue } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
     import { citiesData, allCities } from "./citiesData.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDtEJYJrmyP45qS2da8Cuc6y6Jv5VD0Uhc",
       authDomain: "almurad-system.firebaseapp.com",
-      projectId: "almurad-system",
-      storageBucket: "almurad-system.appspot.com",
-      messagingSenderId: "911755824405",
-      appId: "1:911755824405:web:2bfbd18ddcf038ca48ad1c"
+      databaseURL: "https://almurad-system-default-rtdb.firebaseio.com/",
+      projectId: "almurad-system"
     };
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
 
-    // 🔽 دالة عامة للقائمة المنسدلة
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // 🟠 تحميل المنتجات من الريل تايم
+    let allProducts = [];
+    onValue(ref(db, "products"), (snap) => {
+      if (snap.exists()) {
+        const data = snap.val();
+        allProducts = Object.values(data).map(p => p.name || p);
+      }
+    });
+
+    // 🔽 قائمة منسدلة عامة
     function createDropdown(options, placeholder, onSelect) {
-      const container = document.createElement("div");
-      container.className = "dropdown-input";
+      const wrapper = document.createElement("div");
+      wrapper.style.position = "relative";
 
       const input = document.createElement("input");
       input.type = "text";
       input.placeholder = placeholder;
       input.autocomplete = "off";
 
-      const list = document.createElement("div");
-      list.className = "dropdown-list";
-
-      options.forEach(opt => {
-        const item = document.createElement("div");
-        item.className = "dropdown-item";
-        item.textContent = opt;
-        item.onclick = () => {
-          input.value = opt;
-          list.style.display = "none";
-          onSelect(opt);
-        };
-        list.appendChild(item);
+      const dropdown = document.createElement("div");
+      Object.assign(dropdown.style, {
+        position: "absolute",
+        background: "#fff",
+        border: "1px solid #ccc",
+        borderRadius: "6px",
+        boxShadow: "0 3px 10px rgba(0,0,0,0.2)",
+        maxHeight: "200px",
+        overflowY: "auto",
+        zIndex: "9999",
+        display: "none",
+        fontSize: "12px"
       });
 
-      input.onfocus = () => list.style.display = "block";
-      input.oninput = e => {
-        const val = e.target.value.trim();
-        Array.from(list.children).forEach(item => {
-          item.style.display = item.textContent.includes(val) ? "block" : "none";
+      function renderList(filter = "") {
+        dropdown.innerHTML = "";
+        options.filter(o => o.includes(filter)).forEach(o => {
+          const opt = document.createElement("div");
+          opt.textContent = o;
+          opt.style.padding = "5px 8px";
+          opt.style.cursor = "pointer";
+          opt.addEventListener("click", () => {
+            input.value = o;
+            dropdown.style.display = "none";
+            onSelect(o);
+          });
+          dropdown.appendChild(opt);
         });
-      };
+      }
 
-      document.addEventListener("click", e => {
-        if (!container.contains(e.target)) list.style.display = "none";
+      input.addEventListener("focus", () => {
+        dropdown.style.display = "block";
+        renderList();
       });
 
-      container.appendChild(input);
-      container.appendChild(list);
-      return container;
+      input.addEventListener("input", e => renderList(e.target.value.trim()));
+      document.addEventListener("click", e => { if (!wrapper.contains(e.target)) dropdown.style.display = "none"; });
+
+      wrapper.appendChild(input);
+      wrapper.appendChild(dropdown);
+      return wrapper;
     }
 
-    let allProducts = [];
-    async function loadProducts() {
-      const snap = await getDocs(collection(db, "products"));
-      allProducts = snap.docs.map(d => d.data().name);
-    }
-
-    // 🔹 تهيئة القوائم المنسدلة
+    // 🔹 إنشاء القوائم المنسدلة
     function setupDropdowns() {
       const cityDiv = document.getElementById("city");
       const areaDiv = document.getElementById("area");
       const productDiv = document.getElementById("product");
+      const statusDiv = document.getElementById("status");
 
       const cityDropdown = createDropdown(allCities, "اختر المحافظة", val => {
-        const newAreas = citiesData[val] || [];
+        const areas = citiesData[val] || [];
         areaDiv.innerHTML = "";
-        const areaDropdown = createDropdown(newAreas, "اختر المنطقة", () => {});
+        const areaDropdown = createDropdown(areas, "اختر المنطقة", () => {});
         areaDiv.appendChild(areaDropdown);
       });
       cityDiv.appendChild(cityDropdown);
 
-      // المنطقة مبدئيًا فاضية لكن جاهزة
       const areaDropdown = createDropdown([], "اختر المنطقة", () => {});
       areaDiv.appendChild(areaDropdown);
 
-      // المنتج
-      const productDropdown = createDropdown(allProducts, "اختر المنتج", () => {});
-      productDiv.appendChild(productDropdown);
+      // 🔹 تحميل المنتجات من الريل تايم ووضعها في المنسدلة
+onValue(ref(db, "products"), (snap) => {
+  if (snap.exists()) {
+    const data = snap.val();
+    const allProducts = Object.values(data).map(p => p.name || p);
+
+    productDiv.innerHTML = ""; // تنظيف الحقل قبل إعادة الإنشاء
+    const productDropdown = createDropdown(allProducts, "", () => {});
+    productDiv.appendChild(productDropdown);
+  }
+});
+
+
+      const statusOptions = ["", "مثبت", "قيد المعالجة", "قيد التجهيز", "بانتظار البضاعة", "قيد التوصيل", "تم التسليم", "راجع", "رفض"];
+      const statusDropdown = createDropdown(statusOptions, "اختر الحالة", () => {});
+      statusDiv.appendChild(statusDropdown);
     }
 
-    // 💾 حفظ الطلب الجديد
-    document.getElementById("saveBtn").addEventListener("click", async () => {
-      const order = {
-        code: document.getElementById("code").value.trim(),
-        phone: document.getElementById("phone").value.trim(),
-        phone2: document.getElementById("phone2").value.trim(),
-        address: document.getElementById("address").value.trim(),
-        city: document.querySelector("#city input")?.value || "",
-        area: document.querySelector("#area input")?.value || "",
-        price: Number(document.getElementById("price").value),
-        qty: Number(document.getElementById("qty").value),
-        product: document.querySelector("#product input")?.value || "",
-        note: document.getElementById("note").value.trim(),
-        status: document.getElementById("status").value,
-        advertiser: document.getElementById("advertiser").value.trim(),
-        created_at: new Date()
-      };
+   // 💾 حفظ الطلب
+document.getElementById("saveBtn").addEventListener("click", async () => {
+  // 👇 نجيب المستخدم الحالي من التخزين المحلي
+  const loggedUser = JSON.parse(localStorage.getItem("loggedInUser"));
 
-      if (!order.phone || !order.product) {
-        alert("يرجى إدخال رقم الهاتف واسم المنتج على الأقل!");
-        return;
-      }
+  const order = {
+    code: document.getElementById("code").value.trim(),
+    phone1: document.getElementById("phone1").value.trim(),
+    phone2: document.getElementById("phone2").value.trim(),
+    address: document.getElementById("address").value.trim(),
+    city: document.querySelector("#city input")?.value || "",
+    area: document.querySelector("#area input")?.value || "",
+    price: Number(document.getElementById("price").value),
+    quantity: Number(document.getElementById("quantity").value),
+    productName: document.querySelector("#product input")?.value || "",
+    notes: document.getElementById("notes").value.trim(),
+    status: document.querySelector("#status input")?.value || "",
+    advertiser: document.getElementById("advertiser").value.trim(),
+    orderDate: new Date().toISOString(),
 
-      await addDoc(collection(db, "orders"), order);
-      const msg = document.getElementById("savedMsg");
-      msg.style.display = "block";
-      setTimeout(() => msg.style.display = "none", 2000);
+    // ✳️ الإضافات الجديدة المهمة:
+    fixedBy: loggedUser?.username || loggedUser?.name || "غير محدد",
+  // اسم الموظف اللي أضاف الطلب
+    updatedAt: new Date().toISOString()         // وقت آخر تعديل أو إضافة
+  };
+
+  if (!order.phone1 || !order.productName) {
+    alert("يرجى إدخال رقم الهاتف واسم المنتج على الأقل!");
+    return;
+  }
+
+  // 🚀 حفظ الطلب داخل Firebase Realtime Database
+  const newRef = push(ref(db, "orders"));
+  await set(newRef, order);
+
+  // 💬 عرض رسالة نجاح
+  const msg = document.getElementById("savedMsg");
+  msg.style.display = "block";
+  setTimeout(() => window.location.href = "orders.html", 1500);
+});
+
+
+    document.getElementById("backBtn").addEventListener("click", () => {
+      window.location.href = "orders.html";
     });
 
-    document.getElementById("backBtn").onclick = () => window.location.href = "dashboard.html";
-
-    await loadProducts();
     setupDropdowns();
   </script>
-
 </body>
 </html>
