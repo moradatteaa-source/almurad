@@ -81,7 +81,23 @@
     </div>
 
     <!-- عدادات الحالة -->
-    <div id="summary" class="grid"></div>
+<!-- عدادات الحالة + المجموع -->
+<div id="summary" class="grid"></div>
+
+<!-- 🧮 بطاقة المجموع الكلي -->
+<div id="totalCard" class="card" style="
+  margin-top: 10px;
+  background: #043B64;
+  color: white;
+  font-weight: bold;
+  text-align: center;
+  font-size: 18px;
+  padding: 15px;
+  border-radius: 10px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+">
+  📦 إجمالي الطلبات الكلية: <span id="totalOrders">0</span>
+</div>
 
     <!-- الرسوم البيانية -->
     <div class="charts">
@@ -286,6 +302,7 @@
       });
 
       shownCountEl.textContent = filtered.length;
+document.getElementById("totalOrders").textContent = filtered.length;
 
       // --- بيانات الرسوم البيانية ---
       buildCharts(filtered, statusCounts, granularity);
@@ -316,6 +333,7 @@
       overlay.appendChild(box);
       document.body.appendChild(overlay);
       document.getElementById('closeDetails').addEventListener('click', () => overlay.remove());
+      
     }
 
     // بناء الرسوم البيانية

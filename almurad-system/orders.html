@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>الطلبات - نظام المراد</title>
   <style>
+    /* ✅ جعل الصف الأول ثابت عند التمرير للأسفل */
+thead th {
+  position: sticky;
+  top: 0;
+  background: #043B64; /* نفس لون الهيدر */
+  color: white;
+  z-index: 10;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
     body {
       font-family: Tahoma, Arial;
       background: #f5f6fa;
@@ -141,6 +151,16 @@ input, select, textarea {
 <body>
 
   <header id="pageTitle">📦 الطلبات</header>
+<h2 id="pageStatusTitle" style="
+  text-align:center;
+  background:#FF6B2D;
+  color:white;
+  font-weight:bold;
+  padding:10px 0;
+  margin:10px 0;
+  border-radius:8px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.1);
+"></h2>
 
   <div class="top-bar">
   <button class="back-btn" id="backBtn">🔙 رجوع إلى لوحة التحكم</button>
@@ -195,6 +215,201 @@ input, select, textarea {
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import { getDatabase, ref, onValue, update, remove, get } 
     from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+    // 🧩 دالة لربط الطلبات بالمخزون
+// 🧩 دالة ذكية لتحديث المخزون عند تغيير حالة الطلب
+// ✅ تحديث ذكي للمخزون عند تغيير حالة الطلب (يدعم وجود أو عدم وجود متغيرات)
+// ✅ دالة تضمن حفظ تفاصيل الطلب كاملة قبل أي تعديل حالة
+async function ensureOrderDetailsSaved(orderId) {
+  const db = getDatabase();
+  const orderRef = ref(db, `orders/${orderId}`);
+  const snap = await get(orderRef);
+  if (!snap.exists()) return;
+  const order = snap.val();
+
+  // لو أصلاً موجود productsDetailed، ما نسوي شي
+  if (order.productsDetailed && Array.isArray(order.productsDetailed) && order.productsDetailed.length > 0) return;
+
+  // نجهز بيانات المنتج
+  const productName = order.productName || "";
+  const qty = Number(order.quantity) || 0;
+  const variants = order.selectedVariants || {};
+
+  if (!productName || qty <= 0) return;
+
+  const details = [{
+    name: productName,
+    qty: qty,
+    variants: variants
+  }];
+
+  await update(orderRef, { productsDetailed: details });
+  console.log(`💾 تم حفظ تفاصيل الطلب ${orderId} تلقائياً`);
+}
+
+// ✅ تعريف عالمي لدالة تحديث المخزون
+window.adjustStockOnStatusChange = async function(orderId, newStatus) {
+  const db = getDatabase();
+  const orderRef = ref(db, `orders/${orderId}`);
+  const orderSnap = await get(orderRef);
+  if (!orderSnap.exists()) return;
+  const order = orderSnap.val();
+
+  console.log("🔥 تحديث المخزون بناءً على حالة الطلب:", orderId, newStatus);
+
+// ✅ تحديد المنتجات سواء فيها متغيرات أو لا
+const products = [];
+
+if (order.productsDetailed) {
+  // نحول إلى مصفوفة مهما كان الشكل (Array أو Object)
+  const detailedArr = Array.isArray(order.productsDetailed)
+    ? order.productsDetailed
+    : Object.values(order.productsDetailed);
+
+  detailedArr.forEach(p => {
+    // إذا المنتج بي متغيرات نحتفظ بيها، إذا لا نستخدم "بدون متغير"
+    const hasVariants = p.variants && Object.keys(p.variants).length > 0;
+    const variantKey = hasVariants
+      ? Object.entries(p.variants)
+          .map(([k, v]) => `${k}:${v}`)
+          .join("_")
+      : "بدون_متغير";
+
+    products.push({
+      name: p.name || "منتج غير معروف",
+      qty: parseInt(p.qty) || 1,
+      variantKey: variantKey,
+      variants: hasVariants ? p.variants : {}
+    });
+  });
+} else {
+  // الطلبات القديمة بدون تفاصيل
+  if (order.productName) {
+    products.push({
+      name: order.productName.split("،")[0].trim(),
+      qty: parseInt(order.quantity) || 1,
+      variantKey: "بدون_متغير",
+      variants: order.selectedVariants || {}
+    });
+  }
+
+  if (order.extraProducts && Array.isArray(order.extraProducts)) {
+    order.extraProducts.forEach(p => {
+      const hasVariants = p.selectedVariants && Object.keys(p.selectedVariants).length > 0;
+      const variantKey = hasVariants
+        ? Object.entries(p.selectedVariants)
+            .map(([k, v]) => `${k}:${v}`)
+            .join("_")
+        : "بدون_متغير";
+
+      products.push({
+        name: p.name,
+        qty: parseInt(p.qty) || 1,
+        variantKey: variantKey,
+        variants: hasVariants ? p.selectedVariants : {}
+      });
+    });
+  }
+}
+
+
+
+  // 🧩 تنفيذ التعديل على كل منتج فعلي
+  for (const item of products) {
+    const { name, qty, variants } = item;
+    if (!name || isNaN(qty)) continue;
+
+    const warehouseRef = ref(db, `warehouse/${name}`);
+    const warehouseSnap = await get(warehouseRef);
+    if (!warehouseSnap.exists()) {
+      console.log(`🚫 المنتج "${name}" غير موجود في المخزن`);
+      continue;
+    }
+
+    const warehouse = warehouseSnap.val();
+    const stock = warehouse.stock || {};
+    const processed = warehouse.processedOrders || {};
+    let totalQty = parseInt(warehouse.totalQty || 0);
+
+    // 🧠 بناء المفتاح الحقيقي للمتغيرات (إن وُجدت)
+    let variantKey = null;
+    if (variants && Object.keys(variants).length > 0) {
+      const parts = [];
+      if (variants["القياس"]) parts.push(`القياس: ${variants["القياس"]}`);
+      if (variants["اللون"]) parts.push(`اللون: ${variants["اللون"]}`);
+      variantKey = parts.join(" | ");
+    }
+
+    // 🔍 محاولة إيجاد المفتاح داخل stock
+    let foundKey = null;
+    if (variantKey) {
+      const normalize = (t) =>
+        t.replace(/\s+/g, "")
+         .replace(/[|:،]/g, "")
+         .replace(/اللون/g, "")
+         .replace(/القياس/g, "")
+         .toLowerCase();
+      const vk = normalize(variantKey);
+      for (const key of Object.keys(stock)) {
+        const nk = normalize(key);
+        if (nk.includes(vk) || vk.includes(nk)) {
+          foundKey = key;
+          break;
+        }
+      }
+    }
+
+    if (newStatus === "قيد التوصيل" && !processed[`deduct_${orderId}_${name}`]) {
+  if (foundKey && stock[foundKey] !== undefined) {
+    // ✅ خصم من المتغير المحدد
+    stock[foundKey] = Math.max(0, stock[foundKey] - qty);
+    console.log(`📦 خصم ${qty} من ${name} (${foundKey})`);
+  } else if (stock["إجمالي الكمية"] !== undefined) {
+    // ✅ خصم مباشر من إجمالي الكمية
+    stock["إجمالي الكمية"] = Math.max(0, stock["إجمالي الكمية"] - qty);
+    console.log(`📦 خصم ${qty} من ${name} (إجمالي الكمية)`);
+  } else {
+    // ⚠️ كحل احتياطي
+    totalQty = Math.max(0, totalQty - qty);
+    console.log(`📦 خصم ${qty} من ${name} (من الإجمالي فقط)`);
+  }
+const variantId = variantKey ? variantKey.replace(/\s+/g, "_") : "default";
+processed[`deduct_${orderId}_${name}_${variantId}`] = true;
+}
+
+
+   if (newStatus === "تم استلام الراجع" && !processed[`return_${orderId}_${name}`]) {
+  if (foundKey && stock[foundKey] !== undefined) {
+    stock[foundKey] += qty;
+    console.log(`🔁 إرجاع ${qty} إلى ${name} (${foundKey})`);
+  } else if (stock["إجمالي الكمية"] !== undefined) {
+    stock["إجمالي الكمية"] += qty;
+    console.log(`🔁 إرجاع ${qty} إلى ${name} (إجمالي الكمية)`);
+  } else {
+    totalQty += qty;
+    console.log(`🔁 إرجاع ${qty} إلى ${name} (إجمالي فقط)`);
+  }
+processed[`return_${orderId}_${name}_${variantId}`] = true;
+}
+
+
+    // 🔄 إعادة حساب الإجمالي من جميع المتغيرات
+    totalQty = Object.values(stock).reduce((a, b) => a + b, 0);
+
+    // 💾 تحديث المخزن
+    await update(warehouseRef, {
+      stock,
+      totalQty,
+      processedOrders: processed,
+      lastUpdate: new Date().toISOString()
+    });
+
+    console.log(`✅ تم تحديث ${name}`, { totalQty, stock });
+  }
+};
+
+
+
+
 
     const firebaseConfig = {
       apiKey: "AIzaSyDtEJYJrmyP45qS2da8Cuc6y6Jv5VD0Uhc",
@@ -211,8 +426,20 @@ const db = getDatabase(app);
 const ordersBody = document.getElementById("ordersBody");
 const searchInput = document.getElementById("searchInput");
 
-// 🔹 نضيف هذا السطر هنا
-const currentUser = sessionStorage.getItem("userName") || "غير معروف";
+// 🔹 جلب اسم المستخدم من التخزين
+let currentUser = sessionStorage.getItem("userName");
+
+// 🔸 في حال ما موجود في session (مثلاً إعادة تحميل الصفحة)
+if (!currentUser) {
+  const savedUser = localStorage.getItem("loggedInUser");
+  if (savedUser) {
+    const parsed = JSON.parse(savedUser);
+    currentUser = parsed.name || parsed.username || parsed.displayName || "غير معروف";
+  } else {
+    currentUser = "غير معروف";
+  }
+}
+
 
 
     let allProducts = [];
@@ -221,34 +448,131 @@ const currentUser = sessionStorage.getItem("userName") || "غير معروف";
     const currentStatus = decodeURIComponent(urlParams.get("status") || "");
 
     // تحميل المنتجات
-    const productsRef = ref(db, "products");
-    onValue(productsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        allProducts = Object.values(data).map(p => p.name || p);
-      }
-    });
+    // 🟢 تحميل المنتجات من المسار الجديد "warehouse"
+const productsRef = ref(db, "warehouse");
+onValue(productsRef, (snapshot) => {
+  if (snapshot.exists()) {
+    const data = snapshot.val();
+    // كل منتج مفتاحه هو اسمه مثل "بوغاتي"
+    allProducts = Object.keys(data); 
+  } else {
+    allProducts = [];
+  }
+});
 
-    // تحميل الطلبات مع فلترة دقيقة
-    const ordersRef = ref(db, "orders");
-    onValue(ordersRef, (snapshot) => {
-      if (!snapshot.exists()) {
-        ordersBody.innerHTML = `<tr><td colspan="17">🚫 لا توجد طلبات</td></tr>`;
-        return;
-      }
+// ✅ متغير عام يخزن عدد الطلبات القديم حتى نعرف إذا دخل طلب جديد
+let previousOrderCount = 0;
 
-      allOrders = Object.entries(snapshot.val()).map(([id, data]) => ({ id, ...data }));
-      
-      // فلترة حسب الحالة الحالية
-      const filtered = allOrders.filter(o => {
-        const st = (o.status || "").trim();
-        return currentStatus === "" 
-          ? (st === "" || st === null)
-          : st === currentStatus;
-      });
+// 🟢 مراقبة الطلبات الجديدة + تحديث الجدول معاً
+const ordersRef = ref(db, "orders");
+onValue(ordersRef, (snapshot) => {
+  if (!snapshot.exists()) {
+    ordersBody.innerHTML = `<tr><td colspan="17">🚫 لا توجد طلبات</td></tr>`;
+    return;
+  }
 
-      renderOrders(filtered);
-    });
+  // 🔹 تحويل البيانات إلى مصفوفة
+  const data = snapshot.val();
+  allOrders = Object.entries(data).map(([id, order]) => ({ id, ...order }));
+
+ // 🔹 مقارنة العدد لمعرفة إذا أكو طلب جديد
+const currentCount = Object.keys(data).length;
+
+// ✅ هذا الإشعار الآن يشتغل في كل الصفحات (بغض النظر عن الحالة)
+if (previousOrderCount && currentCount > previousOrderCount) {
+  const diff = currentCount - previousOrderCount;
+  showNewOrderNotification(diff);
+}
+
+// ✅ نحدث العدد حتى لا يعيد الإشعار
+previousOrderCount = currentCount;
+
+
+  previousOrderCount = currentCount;
+
+  // 🔹 تحديث الجدول حسب الحالة المختارة
+  refreshVisibleOrders();
+});
+function showNewOrderNotification(count = 1) {
+  // إزالة القديم
+  const oldBar = document.getElementById("newOrderBar");
+  if (oldBar) oldBar.remove();
+
+  // إنشاء الإشعار
+  const bar = document.createElement("div");
+  bar.id = "newOrderBar";
+  bar.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;animation:fadeInUp 0.4s ease">
+      <span style="font-size:28px;background:#fff;color:#28a745;border-radius:50%;
+      width:46px;height:46px;display:flex;align-items:center;justify-content:center;
+      box-shadow:0 0 10px rgba(255,255,255,0.3)">💵</span>
+      <div>
+        <div style="font-weight:bold;font-size:16px;">وصل ${count} طلب جديد${count>1?"ات":""}!</div>
+        <div style="font-size:13px;opacity:0.9;">تحقق الآن من الطلبات</div>
+      </div>
+    </div>
+  `;
+  Object.assign(bar.style, {
+    position: "fixed",
+    bottom: "25px",
+    right: "25px",
+    background: "linear-gradient(135deg,#28a745,#20c997)",
+    color: "white",
+    padding: "14px 22px",
+    borderRadius: "16px",
+    fontFamily: "Tajawal, sans-serif",
+    boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+    zIndex: "999999",
+    cursor: "pointer",
+    opacity: "1",
+    transition: "all 0.6s ease"
+  });
+  document.body.appendChild(bar);
+
+ if (window.soundAllowed) {
+const audio = new Audio("cash-register-kaching.mp3");
+  audio.volume = 1.0;
+  audio.play().catch(err => console.warn("🔇 فشل تشغيل الصوت:", err));
+}
+
+
+
+
+  // ✨ تفاعل جميل
+  bar.addEventListener("mouseenter",()=>bar.style.transform="scale(1.05)");
+  bar.addEventListener("mouseleave",()=>bar.style.transform="scale(1)");
+
+  // ⏳ يختفي بعد 6 ثوانٍ
+  setTimeout(()=>{
+    bar.style.opacity="0";
+    bar.style.transform="translateY(20px)";
+    setTimeout(()=>bar.remove(),600);
+  },6000);
+
+  const style=document.createElement("style");
+  style.textContent=`
+    @keyframes fadeInUp {
+      from {opacity:0;transform:translateY(40px);}
+      to {opacity:1;transform:translateY(0);}
+    }`;
+  document.head.appendChild(style);
+}
+
+
+
+
+// 🔄 دالة لتحديث العرض تلقائي حسب الحالة الحالية
+function refreshVisibleOrders() {
+  const filtered = allOrders.filter(o => {
+    const st = (o.status || "").trim();
+    return currentStatus === "" 
+      ? (st === "" || st === null)
+      : st === currentStatus;
+  });
+
+  renderOrders(filtered);
+}
+
 
     // أدوات الإدخال والمنسدلات
     function createEditableInput(value, onSave) {
@@ -264,63 +588,221 @@ const currentUser = sessionStorage.getItem("userName") || "غير معروف";
       t.addEventListener("change", e => onSave(e.target.value));
       return t;
     }
+// ✅ دالة منسدلة احترافية – تظهر فوق الجدول وتُغلق أي منسدلة أخرى مفتوحة
+function createDropdown(options, selected, onChange) {
+  const wrapper = document.createElement("div");
+  wrapper.style.position = "relative";
 
-    function createDropdown(options, selected, onChange) {
-      const wrapper = document.createElement("div");
-      const input = document.createElement("input");
-      input.type = "text";
-      input.value = selected || "";
-      input.placeholder = "اختر...";
-      input.style.cursor = "pointer";
+  const input = document.createElement("input");
+  input.type = "text";
+  input.value = selected || "";
+  input.placeholder = "اختر...";
+  input.readOnly = true;
+  input.style.cursor = "pointer";
+  input.style.width = "100%";
+  input.style.borderRadius = "4px";
+  input.style.padding = "4px";
+  input.style.border = "1px solid #ccc";
+  input.style.background = "#fff";
 
-      const dropdown = document.createElement("div");
-      Object.assign(dropdown.style, {
-        position: "fixed",
-        background: "#fff",
-        border: "1px solid #ccc",
-        borderRadius: "6px",
-        boxShadow: "0 3px 10px rgba(0,0,0,0.2)",
-        maxHeight: "200px",
-        overflowY: "auto",
-        zIndex: "999999",
-        display: "none",
-        fontSize: "12px"
-      });
+  // ⚙️ المنسدلة
+  const dropdown = document.createElement("div");
+  Object.assign(dropdown.style, {
+    position: "fixed", // ⬅️ فوق الجدول دومًا
+    background: "#fff",
+    border: "1px solid #ccc",
+    borderRadius: "6px",
+    boxShadow: "0 3px 10px rgba(0,0,0,0.25)",
+    maxHeight: "200px",
+    overflowY: "auto",
+    zIndex: "9999999",
+    display: "none",
+    fontSize: "13px"
+  });
+  document.body.appendChild(dropdown);
 
-      function renderList(filter = "") {
-        dropdown.innerHTML = "";
-        options.filter(o => o.includes(filter)).forEach(o => {
-          const opt = document.createElement("div");
-          opt.textContent = o;
-          opt.style.padding = "5px 8px";
-          opt.style.cursor = "pointer";
-          opt.addEventListener("click", () => {
-            input.value = o;
-            dropdown.style.display = "none";
-            onChange(o);
-          });
-          dropdown.appendChild(opt);
-        });
-      }
+  // 🔹 إنشاء الخيارات
+  dropdown.innerHTML = options.map(o => `
+    <div class="opt" style="padding:7px 10px;cursor:pointer;">
+      ${o}
+    </div>
+  `).join("");
 
-      input.addEventListener("focus", () => {
-        const rect = input.getBoundingClientRect();
-        dropdown.style.top = rect.bottom + "px";
-        dropdown.style.left = rect.left + "px";
-        dropdown.style.width = rect.width + "px";
-        dropdown.style.display = "block";
-        renderList();
-      });
+  dropdown.querySelectorAll(".opt").forEach(opt => {
+    opt.addEventListener("click", () => {
+      input.value = opt.textContent.trim();
+      dropdown.style.display = "none";
+      if (typeof onChange === "function") onChange(opt.textContent.trim());
+    });
+    opt.addEventListener("mouseenter", () => opt.style.background = "#f1f1f1");
+    opt.addEventListener("mouseleave", () => opt.style.background = "");
+  });
 
-      input.addEventListener("input", e => renderList(e.target.value.trim()));
-      document.addEventListener("click", e => {
-        if (!wrapper.contains(e.target)) dropdown.style.display = "none";
-      });
+  // 🧠 متغير عالمي لمتابعة آخر منسدلة مفتوحة
+  window.currentOpenDropdown = window.currentOpenDropdown || null;
 
-      wrapper.appendChild(input);
-      document.body.appendChild(dropdown);
-      return wrapper;
+  // 🔻 فتح المنسدلة
+  input.addEventListener("click", (e) => {
+    e.stopPropagation();
+
+    // إغلاق أي منسدلة مفتوحة مسبقًا
+    if (window.currentOpenDropdown && window.currentOpenDropdown !== dropdown) {
+      window.currentOpenDropdown.style.display = "none";
     }
+
+    const rect = input.getBoundingClientRect();
+    dropdown.style.top = rect.bottom + "px";
+    dropdown.style.left = rect.left + "px";
+    dropdown.style.width = rect.width + "px";
+
+    dropdown.style.display =
+      dropdown.style.display === "none" ? "block" : "none";
+
+    // حفظ المنسدلة الحالية كمفتوحة
+    window.currentOpenDropdown =
+      dropdown.style.display === "block" ? dropdown : null;
+  });
+
+  // ⛔ إغلاق عند النقر خارجها فقط
+  document.addEventListener("click", (e) => {
+    if (!dropdown.contains(e.target) && !wrapper.contains(e.target)) {
+      dropdown.style.display = "none";
+      window.currentOpenDropdown = null;
+    }
+  });
+
+  wrapper.appendChild(input);
+  return wrapper;
+}
+
+
+// ✅ دالة لعرض خانة "اسم المنتج" مع بحث وتحويلها إلى فقاعات
+function createTagsDropdownCell(orderId, initialValue = "", options = [], onSave) {
+  const td = document.createElement("td");
+
+  const container = document.createElement("div");
+  container.style.cssText = `
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 4px;
+    background: #fff;
+    min-height: 34px;
+    cursor: text;
+  `;
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.placeholder = "ابحث عن منتج...";
+  input.style.cssText = `
+    border: none;
+    outline: none;
+    flex: 1;
+    min-width: 80px;
+    font-size: 12px;
+  `;
+
+  let tags = initialValue
+    ? initialValue.split("،").map(t => t.trim()).filter(Boolean)
+    : [];
+
+  function renderTags() {
+    container.innerHTML = "";
+    tags.forEach((tag, index) => {
+      const span = document.createElement("span");
+      span.textContent = tag;
+      span.style.cssText = `
+        background: #043B64;
+        color: white;
+        border-radius: 20px;
+        padding: 3px 10px;
+        font-size: 11px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      `;
+      const remove = document.createElement("span");
+      remove.textContent = "✖";
+      remove.style.cursor = "pointer";
+      remove.onclick = () => {
+        tags.splice(index, 1);
+        saveTags();
+      };
+      span.appendChild(remove);
+      container.appendChild(span);
+    });
+    container.appendChild(input);
+  }
+
+  function saveTags() {
+    const val = tags.join("، ");
+    onSave(val);
+    renderTags();
+  }
+
+  // 🔽 المنسدلة للبحث عن المنتج
+  const dropdown = document.createElement("div");
+  Object.assign(dropdown.style, {
+    position: "fixed",
+    background: "#fff",
+    border: "1px solid #ccc",
+    borderRadius: "6px",
+    boxShadow: "0 3px 10px rgba(0,0,0,0.2)",
+    maxHeight: "200px",
+    overflowY: "auto",
+    zIndex: "999999",
+    display: "none",
+    fontSize: "12px"
+  });
+
+  function showDropdown(filter = "") {
+    dropdown.innerHTML = "";
+    const filtered = options.filter(o => o.includes(filter));
+    if (filtered.length === 0) {
+      const noResult = document.createElement("div");
+      noResult.textContent = "لا توجد نتائج";
+      noResult.style.padding = "6px 10px";
+      dropdown.appendChild(noResult);
+    } else {
+      filtered.forEach(o => {
+        const opt = document.createElement("div");
+        opt.textContent = o;
+        opt.style.padding = "5px 8px";
+        opt.style.cursor = "pointer";
+        opt.addEventListener("click", () => {
+          if (!tags.includes(o)) {
+            tags.push(o);
+            saveTags();
+          }
+          dropdown.style.display = "none";
+          input.value = "";
+        });
+        dropdown.appendChild(opt);
+      });
+    }
+
+    const rect = input.getBoundingClientRect();
+    dropdown.style.top = rect.bottom + "px";
+    dropdown.style.left = rect.left + "px";
+    dropdown.style.width = rect.width + "px";
+    dropdown.style.display = "block";
+  }
+
+  input.addEventListener("focus", () => showDropdown());
+  input.addEventListener("input", e => showDropdown(e.target.value.trim()));
+  document.addEventListener("click", e => {
+    if (!container.contains(e.target)) dropdown.style.display = "none";
+  });
+
+  container.appendChild(input);
+  document.body.appendChild(dropdown);
+  renderTags();
+  td.appendChild(container);
+  return td;
+}
 
     // عرض الطلبات
     function renderOrders(orders) {
@@ -355,9 +837,17 @@ const currentUser = sessionStorage.getItem("userName") || "غير معروف";
 detailsBtn.addEventListener("click", () => {
   const modal = document.getElementById("detailsModal");
   const frame = document.getElementById("detailsFrame");
-  localStorage.setItem("selectedOrder", order.id);
-  frame.src = "order-details.html"; // نستخدم نفس الصفحة الأصلية
+
+localStorage.setItem("selectedOrder", order.id);
+
+// ✅ نحفظ اسم الحالة الحالية (مثل "مثبت" أو "قيد المعالجة")
+localStorage.setItem("lastStatusView", currentStatus);
+
+// ✅ نرسلها أيضًا كـ query في الرابط حتى صفحة التفاصيل تعرفها
+frame.src = `order-details.html?status=${encodeURIComponent(currentStatus)}`;
+
   modal.style.display = "block";
+
 
   // السماح بإغلاقها بزر رجوع
   window.addEventListener("message", (e) => {
@@ -381,59 +871,155 @@ detailsBtn.addEventListener("click", () => {
           { val: order.address, textarea: true, fn: v => update(ref(db, `orders/${order.id}`), { address: v }) },
           { val: order.price, fn: v => update(ref(db, `orders/${order.id}`), { price: v }) },
           { val: order.quantity, fn: v => update(ref(db, `orders/${order.id}`), { quantity: v }) },
-          { val: order.productName || order.product, dropdown: allProducts, fn: v => update(ref(db, `orders/${order.id}`), { productName: v }) },
+{
+  val: order.productName || order.product,
+  customRender: "tagsInput",
+  fn: v => update(ref(db, `orders/${order.id}`), { productName: v })
+},
+
           { val: order.notes, textarea: true, fn: v => update(ref(db, `orders/${order.id}`), { notes: v }) },
           { val: order.receiptNum, fn: v => update(ref(db, `orders/${order.id}`), { receiptNum: v }) },
           {
            
   val: order.status || "",
-  dropdown: ["", "مثبت", "قيد المعالجة", "قيد التجهيز", "بانتظار البضاعة", "قيد التوصيل", "تم التسليم", "راجع", "رفض"],
-  fn: async (newStatus) => {
-const userName = currentUser;
-    const orderRef = ref(db, `orders/${order.id}`);
+  dropdown: [
+    "",
+    "مثبت",
+    "قيد المعالجة",
+    "قيد التجهيز",
+    "بانتظار البضاعة",
+    "قيد التوصيل",
+    "تم التسليم",
+    "راجع",
+    "تم استلام الراجع",
+    "رفض"
+  ],
+fn: async (newStatus) => {
+  console.log("🧠 تم تغيير الحالة:", newStatus);
+  const userName = currentUser;
+  const orderRef = ref(db, `orders/${order.id}`);
+  const snap = await get(orderRef);
+  const existing = snap.exists() ? snap.val() : {};
 
-    // جلب الطلب الحالي
-    const snap = await get(orderRef);
-    const existing = snap.exists() ? snap.val() : {};
+  // 🧱 حفظ الحالة الجديدة وسجل التاريخ
+  const historyEntry = {
+    status: newStatus,
+    by: userName,
+    at: new Date().toISOString(),
+  };
 
-    // تحديث الطلب بالاسم والتاريخ
-    await update(orderRef, {
-      status: newStatus,
-      updatedBy: userName,
-      updatedAt: new Date().toISOString(),
-fixedBy:
-  (existing.fixedBy && existing.fixedBy !== "غير معروف")
-    ? existing.fixedBy
-    : ((newStatus === "مثبت" || newStatus === "رفض") ? userName : existing.fixedBy || userName)
-    });
+  const updates = {
+    status: newStatus,
+    updatedBy: userName,
+    updatedAt: new Date().toISOString(),
+    statusHistory: [...(existing.statusHistory || []), historyEntry],
+  };
 
-    // إزالة الطلب من الصفحة إذا خرج من الفلترة الحالية
-    const st = (newStatus || "").trim();
-    const shouldHide =
-      (currentStatus === "" && st !== "") ||
-      (currentStatus !== "" && st !== currentStatus);
-    if (shouldHide) tr.remove();
+  if (newStatus === "مثبت" || newStatus === "رفض") {
+    updates.fixedBy = userName;
   }
+
+  // ✅ نحفظ أولاً أي تفاصيل ناقصة
+  if (["مثبت", "قيد التوصيل"].includes(newStatus)) {
+    await ensureOrderDetailsSaved(order.id);
+  }
+
+  // 💾 تحديث حالة الطلب بالـ Realtime
+  await update(orderRef, updates);
+  console.log(`✅ تم تحديث الحالة إلى ${newStatus}`);
+
+  // 🧩 إذا الحالة تتطلب تعديل بالمخزون
+  if (["قيد التوصيل", "تم استلام الراجع"].includes(newStatus)) {
+    console.log("🚀 تنفيذ تحديث المخزون من الجدول:", newStatus);
+    await adjustStockOnStatusChange(order.id, newStatus);
+  }
+
+  // 🔻 إزالة الطلب إذا خرج من الفلترة الحالية
+  const st = (newStatus || "").trim();
+  const shouldHide =
+    (currentStatus === "" && st !== "") ||
+    (currentStatus !== "" && st !== currentStatus);
+  if (shouldHide) tr.remove();
 }
-,
+
+},
           { val: order.orderDate || "-", readonly: true },
           { val: order.advertiser, fn: v => update(ref(db, `orders/${order.id}`), { advertiser: v }) }
         ];
+function createProductTagsCell(productName) {
+  const td = document.createElement("td");
+  if (!productName) {
+    td.textContent = "-";
+    return td;
+  }
+
+  const products = productName.split("،").map(p => p.trim());
+  products.forEach(name => {
+    const tag = document.createElement("span");
+    tag.textContent = name;
+    tag.style.cssText = `
+      display: inline-block;
+      background: #043B64;
+      color: white;
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 11px;
+      margin: 2px;
+      white-space: nowrap;
+    `;
+    td.appendChild(tag);
+  });
+  return td;
+}
 
         fields.forEach(f => {
-          const td = document.createElement("td");
-          if (f.readonly) td.textContent = f.val || "-";
-          else if (f.textarea) td.appendChild(createTextarea(f.val, f.fn));
-          else if (f.dropdown) td.appendChild(createDropdown(f.dropdown, f.val, f.fn));
-          else if (f.city) {
-            const cityDropdown = createDropdown(allCities, order.city || "", val => update(ref(db, `orders/${order.id}`), { city: val, area: "" }));
-            td.appendChild(cityDropdown);
-          } else if (f.area) {
-            const areaDropdown = createDropdown(areas, order.area || "", val => update(ref(db, `orders/${order.id}`), { area: val }));
-            td.appendChild(areaDropdown);
-          } else td.appendChild(createEditableInput(f.val, f.fn));
-          tr.appendChild(td);
-        });
+  let td;
+
+ if (f.customRender === "tagsInput") {
+  td = createTagsDropdownCell(order.id, order.productName || "", allProducts, async (newVal) => {
+    const orderRef = ref(db, `orders/${order.id}`);
+
+    // 🧠 نحصل على الطلب الحالي أولاً
+    const snap = await get(orderRef);
+    const existing = snap.exists() ? snap.val() : {};
+
+    // ✅ تحديث productName مباشرة
+    const updates = { productName: newVal };
+
+    // ✅ تحديث productsDetailed (ننشئه لو غير موجود)
+    if (!existing.productsDetailed || !Array.isArray(existing.productsDetailed) || existing.productsDetailed.length === 0) {
+      updates.productsDetailed = [{ name: newVal, qty: existing.quantity || 1 }];
+    } else {
+      // إذا موجود نحدث الاسم الأول فقط
+      existing.productsDetailed[0].name = newVal;
+      updates.productsDetailed = existing.productsDetailed;
+    }
+
+    // 💾 تحديث الطلب بالـ Realtime
+    await update(orderRef, updates);
+    console.log(`✅ تم تحديث المنتج إلى "${newVal}" في كل المسارات`);
+  });
+}
+
+
+
+else {
+    td = document.createElement("td");
+    if (f.readonly) td.textContent = f.val || "-";
+    else if (f.textarea) td.appendChild(createTextarea(f.val, f.fn));
+    else if (f.dropdown) td.appendChild(createDropdown(f.dropdown, f.val, f.fn));
+    else if (f.city) {
+      const cityDropdown = createDropdown(allCities, order.city || "", val => update(ref(db, `orders/${order.id}`), { city: val, area: "" }));
+      td.appendChild(cityDropdown);
+    } else if (f.area) {
+      const areaDropdown = createDropdown(areas, order.area || "", val => update(ref(db, `orders/${order.id}`), { area: val }));
+      td.appendChild(areaDropdown);
+    } else td.appendChild(createEditableInput(f.val, f.fn));
+  }
+
+  tr.appendChild(td);
+});
+
 
         ordersBody.appendChild(tr);
       });
@@ -791,6 +1377,20 @@ function openOrderDetailsInline(order) {
 }
 
 
+// ✅ عرض اسم الحالة الحالية في أعلى الصفحة
+document.addEventListener("DOMContentLoaded", () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentStatusName = decodeURIComponent(urlParams.get("status") || "");
+  const pageStatusTitle = document.getElementById("pageStatusTitle");
+
+  if (pageStatusTitle) {
+    if (currentStatusName) {
+      pageStatusTitle.textContent = `📦 الطلبات - ${currentStatusName}`;
+    } else {
+      pageStatusTitle.textContent = "📦 الطلبات الجديدة";
+    }
+  }
+});
 
   </script>
   <!-- ✅ نافذة تفاصيل الطلب الكاملة (منسوخة من صفحة التفاصيل) -->
@@ -803,6 +1403,83 @@ function openOrderDetailsInline(order) {
       z-index:999999;
     "></iframe>
   </div>
+<!-- ✅ تفعيل الصوت بصمت عند أول ضغطة فقط -->
+<script>
+document.addEventListener("click", () => {
+  if (!window.soundAllowed) {
+    window.soundAllowed = true;
+  }
+}, { once: true }); // ← يعني يشتغل مرة وحدة فقط
+</script>
+
+</script>
+<script>
+// ✅ تفعيل الصوت عند أول تفاعل
+document.addEventListener("click", () => {
+  if (!window.soundAllowed) {
+    window.soundAllowed = true;
+    console.log("🔊 تم تفعيل الصوت بنجاح");
+  }
+}, { once: true });
+
+// ✅ تشغيل الصوت مع إشعار الطلب الجديد
+function playNotificationSound() {
+  if (!window.soundAllowed) return; // 🔇 المستخدم ما فعل الصوت بعد
+  const audio = new Audio("cash-register-kaching.mp3");
+  audio.volume = 1.0;
+  audio.play().catch(err => console.warn("🔇 لم يتم تشغيل الصوت:", err));
+}
+
+// ✅ تعديل دالة الإشعار لتشغل الصوت دائمًا
+window.showNewOrderNotification = function(count = 1) {
+  const oldBar = document.getElementById("newOrderBar");
+  if (oldBar) oldBar.remove();
+
+  const bar = document.createElement("div");
+  bar.id = "newOrderBar";
+  bar.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;animation:fadeInUp 0.4s ease">
+      <span style="font-size:28px;background:#fff;color:#28a745;border-radius:50%;
+      width:46px;height:46px;display:flex;align-items:center;justify-content:center;
+      box-shadow:0 0 10px rgba(255,255,255,0.3)">💵</span>
+      <div>
+        <div style="font-weight:bold;font-size:16px;">وصل ${count} طلب جديد${count>1?"ات":""}!</div>
+        <div style="font-size:13px;opacity:0.9;">تحقق الآن من الطلبات</div>
+      </div>
+    </div>
+  `;
+  Object.assign(bar.style, {
+    position: "fixed",
+    bottom: "25px",
+    right: "25px",
+    background: "linear-gradient(135deg,#28a745,#20c997)",
+    color: "white",
+    padding: "14px 22px",
+    borderRadius: "16px",
+    fontFamily: "Tajawal, sans-serif",
+    boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+    zIndex: "999999",
+    cursor: "pointer",
+    opacity: "1",
+    transition: "all 0.6s ease"
+  });
+  document.body.appendChild(bar);
+
+  // 🔊 تشغيل الصوت فوراً مع ظهور الإشعار
+  playNotificationSound();
+
+  // ✨ تأثير بسيط
+  bar.addEventListener("mouseenter",()=>bar.style.transform="scale(1.05)");
+  bar.addEventListener("mouseleave",()=>bar.style.transform="scale(1)");
+
+  // ⏳ يختفي بعد 6 ثوانٍ
+  setTimeout(()=>{
+    bar.style.opacity="0";
+    bar.style.transform="translateY(20px)";
+    setTimeout(()=>bar.remove(),600);
+  },6000);
+};
+</script>
 
 </body>
 </html>

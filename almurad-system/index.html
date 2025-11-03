@@ -3,26 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-
   <title>تسجيل الدخول - نظام المراد</title>
 
-<!-- 👇 تعريف اسم التطبيق للشاشة الرئيسية -->
-<meta name="apple-mobile-web-app-title" content="نظام المراد">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#043B64">
+  <!-- 👇 إعدادات التطبيق -->
+  <meta name="apple-mobile-web-app-title" content="نظام المراد">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#043B64">
 
-<!-- ✅ روابط الشعار والمانيفست -->
-<link rel="icon" type="image/png" href="almurad-system/almurad-logo.png">
-<link rel="shortcut icon" href="almurad-system/almurad-logo.png">
-<link rel="apple-touch-icon" href="almurad-system/almurad-logo.png">
-<link rel="manifest" href="almurad-system/manifest.json">
-
+  <!-- ✅ الشعار والمانيفست -->
+  <link rel="icon" type="image/png" href="almurad-system/almurad-logo.png">
+  <link rel="shortcut icon" href="almurad-system/almurad-logo.png">
+  <link rel="apple-touch-icon" href="almurad-system/almurad-logo.png">
+  <link rel="manifest" href="almurad-system/manifest.json">
 
   <!-- الخط -->
   <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
-  <style>
 
+  <style>
     body {
       font-family: 'Tajawal', sans-serif;
       background: linear-gradient(135deg, #043B64, #FF6B2D);
@@ -34,7 +32,6 @@
       overflow: hidden;
     }
 
-    /* الخلفية المتدرجة */
     body::before {
       content: "";
       position: absolute;
@@ -129,13 +126,11 @@
       margin-top: 10px;
     }
 
-
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(30px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
-    /* 🔸 منع التكبير التلقائي بالموبايل */
     input, select, textarea {
       font-size: 16px !important;
     }
@@ -197,7 +192,7 @@
         Object.keys(users).forEach(key => {
           const userData = users[key];
           const matchByKey = key.toLowerCase() === username.toLowerCase();
-          const matchByField = userData.username && userData.username === username;
+          const matchByField = userData.username && userData.username.toLowerCase() === username.toLowerCase();
           if ((matchByKey || matchByField) && userData.password === password) {
             foundUser = { username: key, ...userData };
           }
@@ -206,6 +201,7 @@
         if (foundUser) {
           const userRef = ref(db, "users/" + foundUser.username);
           const userSnap = await get(userRef);
+
           if (userSnap.exists()) {
             const fullData = userSnap.val();
             if (fullData.roles && typeof fullData.roles === "string") {
@@ -218,10 +214,24 @@
             foundUser.roles = fullData.roles || [];
           }
 
-          localStorage.setItem("loggedInUser", JSON.stringify(foundUser));
-          window.location.href = "dashboard.html";
-          sessionStorage.setItem("userName", foundUser.username || foundUser.name || "غير معروف");
+          // 🔹 تحديد الاسم الحقيقي للعرض (حتى يظهر في الطلبات)
+          const displayName =
+            foundUser.name ||
+            foundUser.username ||
+            foundUser.displayName ||
+            "غير معروف";
 
+          // 🟢 حفظ الاسم في sessionStorage
+          sessionStorage.setItem("userName", displayName);
+
+          // 🟡 حفظ كل بيانات المستخدم في localStorage
+          localStorage.setItem("loggedInUser", JSON.stringify(foundUser));
+
+          // 💬 تأكيد بالكونسول
+          console.log(`مرحباً ${displayName}! تم تسجيل الدخول بنجاح ✅`);
+
+          // 🚀 الانتقال للوحة التحكم
+          window.location.href = "dashboard.html";
         } else {
           errorMsg.textContent = "❌ اسم المستخدم أو كلمة المرور غير صحيحة";
           errorMsg.style.display = "block";
@@ -233,6 +243,5 @@
       }
     });
   </script>
-
 </body>
 </html>

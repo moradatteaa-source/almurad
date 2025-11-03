@@ -39,6 +39,7 @@
     .card {
       background: var(--background-gray);
       border-radius: var(--border-radius);
+      box-shadow: none;
       padding: 15px 20px;
       margin-bottom: 15px;
     }
@@ -130,6 +131,49 @@
       display: none;
     }
 
+    .add-small-btn {
+      background: rgba(4,59,100,0.08);
+      color: #043B64;
+      border: 1px dashed #043B64;
+      border-radius: 8px;
+      padding: 6px 10px;
+      width: 55%;
+      font-size: 13px;
+      cursor: pointer;
+      margin: 8px auto;
+      display: block;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .add-small-btn:hover {
+      background: #043B64;
+      color: #fff;
+      transform: scale(1.03);
+    }
+
+    .extra-product {
+      background: var(--background-gray);
+      border-radius: var(--border-radius);
+      padding: 15px 20px;
+      margin-top: 10px;
+      box-shadow: none;
+    }
+
+    .delete-btn {
+      color: red;
+      cursor: pointer;
+      font-size: 20px;
+      text-align: left;
+    }
+
+    #productTagsContainer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
     @media (max-width: 600px) {
       .container { margin: 10px; }
       .card { padding: 10px; }
@@ -137,7 +181,6 @@
       .field.single { max-width: 100%; }
     }
 
-    /* منع تكبير النص بالموبايل */
     input, select, textarea { font-size: 16px !important; }
   </style>
 </head>
@@ -146,6 +189,7 @@
   <header>➕ إضافة طلب جديد - نظام المراد</header>
 
   <div class="container">
+
     <div class="card">
       <div class="field single">
         <label>الكود:</label>
@@ -177,6 +221,7 @@
           <div id="area"></div>
         </div>
       </div>
+
       <div class="field single">
         <label>العنوان الكامل:</label>
         <textarea id="address"></textarea>
@@ -184,6 +229,16 @@
     </div>
 
     <div class="card">
+      <div class="field single">
+        <label>اسم المنتج:</label>
+        <div id="product"></div>
+      </div>
+
+      <div id="productTagsContainer"></div>
+        <!-- 🟢 مكان عرض المتغيرات الخاصة بالمنتج -->
+  <div id="variantsContainer"></div>
+
+
       <div class="row">
         <div class="field small">
           <label>السعر:</label>
@@ -196,15 +251,25 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="field single">
-        <label>اسم المنتج:</label>
-        <div id="product"></div>
+    <div id="extraProducts"></div>
+    <button id="addProductBtn" class="add-small-btn">➕ إضافة منتج آخر</button>
+
+    <div id="totalsCard" style="display:none;">
+      <div class="row">
+        <div class="field small">
+          <label>إجمالي العدد:</label>
+          <input id="totalQty" readonly>
+        </div>
+        <div class="field small">
+          <label>إجمالي السعر:</label>
+          <input id="totalPrice" readonly>
+        </div>
       </div>
-      <div class="field single">
-        <label>الملاحظات:</label>
-        <textarea id="notes"></textarea>
-      </div>
+    </div>
+
+    <div class="field single">
+      <label>الملاحظات:</label>
+      <textarea id="notes"></textarea>
     </div>
 
     <div class="card">
@@ -224,41 +289,35 @@
     <button id="backBtn">🔙 رجوع</button>
     <div id="savedMsg">✅ تم حفظ الطلب بنجاح</div>
   </div>
-
-  <!-- سكربت الفايربيس -->
+    <!-- سكربت الفايربيس -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-    import { getDatabase, ref, push, set, get, child, onValue } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+    import { getDatabase, ref, push, set, get, onValue } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
     import { citiesData, allCities } from "./citiesData.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyDtEJYJrmyP45qS2da8Cuc6y6Jv5VD0Uhc",
       authDomain: "almurad-system.firebaseapp.com",
       databaseURL: "https://almurad-system-default-rtdb.firebaseio.com/",
-      projectId: "almurad-system"
+      projectId: "almurad-system",
+      storageBucket: "almurad-system.appspot.com",
+      messagingSenderId: "911755824405",
+      appId: "1:911755824405:web:2bfbd18ddcf038ca48ad1c"
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
+const db = getDatabase(app);
+let mainProductObj = {}; // ✅ تعريف عام
 
-    // 🟠 تحميل المنتجات من الريل تايم
-    let allProducts = [];
-    onValue(ref(db, "products"), (snap) => {
-      if (snap.exists()) {
-        const data = snap.val();
-        allProducts = Object.values(data).map(p => p.name || p);
-      }
-    });
 
-    // 🔽 قائمة منسدلة عامة
-    function createDropdown(options, placeholder, onSelect) {
+    // 🔹 دالة إنشاء منسدلة
+    function createDropdown(options, selected, onChange) {
       const wrapper = document.createElement("div");
-      wrapper.style.position = "relative";
-
       const input = document.createElement("input");
       input.type = "text";
-      input.placeholder = placeholder;
-      input.autocomplete = "off";
+      input.value = selected || "";
+      input.placeholder = "اختر...";
+      input.style.cursor = "pointer";
 
       const dropdown = document.createElement("div");
       Object.assign(dropdown.style, {
@@ -284,7 +343,7 @@
           opt.addEventListener("click", () => {
             input.value = o;
             dropdown.style.display = "none";
-            onSelect(o);
+            onChange(o);
           });
           dropdown.appendChild(opt);
         });
@@ -296,96 +355,485 @@
       });
 
       input.addEventListener("input", e => renderList(e.target.value.trim()));
-      document.addEventListener("click", e => { if (!wrapper.contains(e.target)) dropdown.style.display = "none"; });
+      document.addEventListener("click", e => {
+        if (!wrapper.contains(e.target)) dropdown.style.display = "none";
+      });
 
+      wrapper.style.position = "relative";
       wrapper.appendChild(input);
       wrapper.appendChild(dropdown);
       return wrapper;
     }
 
-    // 🔹 إنشاء القوائم المنسدلة
-    function setupDropdowns() {
-      const cityDiv = document.getElementById("city");
-      const areaDiv = document.getElementById("area");
-      const productDiv = document.getElementById("product");
-      const statusDiv = document.getElementById("status");
+   // 🔹 تحميل قائمة المنتجات من المخزن "warehouse"
+let allProducts = [];
 
-      const cityDropdown = createDropdown(allCities, "اختر المحافظة", val => {
-        const areas = citiesData[val] || [];
+onValue(ref(db, "warehouse"), (snap) => {
+  if (snap.exists()) {
+    const data = snap.val();
+
+    // أسماء المنتجات كمفاتيح مباشرة
+    allProducts = Object.keys(data);
+
+    // ✅ إعداد القوائم المنسدلة بعد تحميل البيانات
+    setupDropdowns();
+  } else {
+    allProducts = [];
+  }
+});
+
+// 🟦 تحميل متغيرات المنتج من المخزون الحقيقي فقط (تصفية ديناميكية)
+async function loadVariantsForProduct(container, productName, productObj) {
+  // تنظيف أي متغيرات سابقة
+  const existingVariants = container.querySelector(".variants-container");
+  if (existingVariants) existingVariants.remove();
+
+  const variantsDiv = document.createElement("div");
+  variantsDiv.className = "variants-container";
+  variantsDiv.style.marginTop = "10px";
+
+  const snap = await get(ref(db, `warehouse/${productName}`));
+  if (!snap.exists()) return;
+  const productData = snap.val();
+
+  const stock = productData.stock || {};
+  const activeKeys = Object.entries(stock)
+    .filter(([key, val]) => Number(val) > 0 && key !== "إجمالي الكمية")
+    .map(([key]) => key);
+
+  if (activeKeys.length === 0) return;
+
+  // 🧩 بناء خريطة المتغيرات من المخزون
+  const variantsMap = {};
+  activeKeys.forEach(key => {
+    const parts = key.split("|").map(s => s.trim());
+    for (let i = 0; i < parts.length; i += 2) {
+      const name = parts[i];
+      const value = parts[i + 1];
+      if (!variantsMap[name]) variantsMap[name] = new Set();
+      variantsMap[name].add(value);
+    }
+  });
+
+  productObj.selectedVariants = {};
+  const selectedVariants = productObj.selectedVariants;
+
+  // 🔁 توليد القوائم بشكل ديناميكي مع التصفية
+  const addVariantDropdown = (variantName, possibleValues) => {
+    const label = document.createElement("label");
+    label.textContent = variantName + ":";
+    label.style.color = "#043B64";
+    label.style.fontWeight = "600";
+    label.style.marginTop = "6px";
+
+    const dropdown = createDropdown(possibleValues, "", val => {
+      selectedVariants[variantName] = val;
+
+      // 🔄 إزالة القوائم التالية عند التغيير
+      const allFields = Array.from(variantsDiv.querySelectorAll(".field.single"));
+      const index = allFields.findIndex(f => f.querySelector("label")?.textContent.includes(variantName));
+      allFields.slice(index + 1).forEach(el => el.remove());
+
+      // 🔍 فلترة المفاتيح بناءً على المتغيرات المختارة
+      const filteredKeys = activeKeys.filter(key =>
+        Object.entries(selectedVariants).every(([k, v]) => key.includes(`${k} | ${v}`))
+      );
+
+      // توليد المتغيرات التالية
+      const nextMap = {};
+      filteredKeys.forEach(k => {
+        const parts = k.split("|").map(s => s.trim());
+        for (let i = 0; i < parts.length; i += 2) {
+          const name = parts[i];
+          const value = parts[i + 1];
+          if (!nextMap[name]) nextMap[name] = new Set();
+          nextMap[name].add(value);
+        }
+      });
+
+      const variantNames = Object.keys(variantsMap);
+      const nextIndex = variantNames.indexOf(variantName) + 1;
+      if (nextIndex < variantNames.length) {
+        const nextName = variantNames[nextIndex];
+        if (nextMap[nextName]) {
+          addVariantDropdown(nextName, Array.from(nextMap[nextName]));
+        }
+      }
+    });
+
+    const fieldDiv = document.createElement("div");
+    fieldDiv.className = "field single";
+    fieldDiv.appendChild(label);
+    fieldDiv.appendChild(dropdown);
+    variantsDiv.appendChild(fieldDiv);
+  };
+
+  // 🟢 أول متغير فقط بالبداية
+  const firstVariant = Object.keys(variantsMap)[0];
+  if (firstVariant) {
+    addVariantDropdown(firstVariant, Array.from(variantsMap[firstVariant]));
+  }
+
+  // 🔸 عرض في مكانه الصحيح (رئيسي أو إضافي)
+  const mainVariantsDiv = document.getElementById("variantsContainer");
+  if (container.id === "product" || container.classList.contains("card")) {
+    mainVariantsDiv.innerHTML = "";
+    mainVariantsDiv.appendChild(variantsDiv);
+  } else {
+    container.appendChild(variantsDiv);
+  }
+}
+
+
+
+    // 🟠 متغيرات عامة
+    let extraProducts = [];
+
+    // 🔹 إضافة منتج إضافي
+    function addExtraProduct(product = { name: "", price: 0, qty: 0 }) {
+      const card = document.createElement("div");
+      card.className = "extra-product";
+
+      const nameField = document.createElement("div");
+      nameField.className = "field single";
+      const nameLabel = document.createElement("label");
+      nameLabel.textContent = "اسم المنتج:";
+      const dropdownContainer = document.createElement("div");
+      const dropdown = createDropdown(allProducts, product.name, async val => {
+  product.name = val;
+  renderProductTags();
+  await loadVariantsForProduct(card, val, product); // ✅ تحميل المتغيرات للمنتج الإضافي
+});
+
+      dropdownContainer.appendChild(dropdown);
+      nameField.appendChild(nameLabel);
+      nameField.appendChild(dropdownContainer);
+
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML = `
+        <div class="field small">
+          <label>السعر:</label>
+          <input type="number" class="price-input" value="${product.price || ""}">
+        </div>
+        <div class="field small">
+          <label>العدد:</label>
+          <input type="number" class="qty-input" value="${product.qty || ""}">
+        </div>
+      `;
+
+      const del = document.createElement("span");
+del.className = "delete-btn";
+del.textContent = "🗑";
+del.style.cursor = "pointer";
+del.style.fontSize = "20px";
+del.title = "حذف هذا المنتج";
+
+// ✅ الحذف فقط عند الضغط على السلة
+del.addEventListener("click", (e) => {
+  e.stopPropagation(); // يمنع تنفيذ أي حدث ثاني
+  card.remove();
+  extraProducts = extraProducts.filter(p => p !== product);
+  updateTotals();
+  renderProductTags();
+});
+
+
+      card.appendChild(nameField);
+      card.appendChild(row);
+      card.appendChild(del);
+      document.getElementById("extraProducts").appendChild(card);
+
+      const priceInput = row.querySelector(".price-input");
+      const qtyInput = row.querySelector(".qty-input");
+
+      priceInput.addEventListener("input", () => {
+        product.price = parseFloat(priceInput.value) || 0;
+        updateTotals();
+      });
+      qtyInput.addEventListener("input", () => {
+        product.qty = parseFloat(qtyInput.value) || 0;
+        updateTotals();
+      });
+
+      extraProducts.push(product);
+      updateTotals();
+      document.getElementById("totalsCard").style.display = "block";
+      renderProductTags();
+    }
+
+    // 🔹 تحديث المجموع
+    function updateTotals() {
+  const mainQty = parseFloat(document.getElementById("quantity").value) || 0;
+  const mainPrice = parseFloat(document.getElementById("price").value) || 0;
+  const mainTotal = mainQty * mainPrice;
+
+  const extraQty = extraProducts.reduce((sum, p) => sum + (p.qty || 0), 0);
+  const extraTotal = extraProducts.reduce((sum, p) => sum + ((p.qty || 0) * (p.price || 0)), 0);
+
+  const totalQty = mainQty + extraQty;
+  const totalPrice = mainTotal + extraTotal;
+
+  const totalQtyInput = document.getElementById("totalQty");
+  const totalPriceInput = document.getElementById("totalPrice");
+  const totalsCard = document.getElementById("totalsCard");
+
+  // ✅ إذا ماكو منتج أو عدد أو سعر نخفيها تماماً
+  if ((mainQty === 0 && mainPrice === 0) && extraProducts.length === 0) {
+    totalQtyInput.value = "";
+    totalPriceInput.value = "";
+    totalsCard.style.display = "none";
+  } else {
+    totalQtyInput.value = totalQty;
+    totalPriceInput.value = totalPrice.toFixed(0);
+    totalsCard.style.display = "block";
+  }
+}
+
+
+    // 🔸 زر الإضافة
+    document.getElementById("addProductBtn").addEventListener("click", () => {
+      addExtraProduct();
+    });
+
+    // 🟦 عرض أسماء المنتجات كفقاعات
+    function renderProductTags() {
+      const container = document.getElementById("productTagsContainer");
+      container.innerHTML = "";
+
+      const mainName = document.getElementById("product").querySelector("input")?.value.trim();
+      if (mainName) {
+        const chip = createTagChip(mainName, () => {
+          document.getElementById("product").querySelector("input").value = "";
+          renderProductTags();
+        });
+        container.appendChild(chip);
+      }
+
+      extraProducts.forEach((p, i) => {
+        if (p.name) {
+          const chip = createTagChip(p.name, () => {
+            extraProducts.splice(i, 1);
+            renderProductTags();
+          });
+          container.appendChild(chip);
+        }
+      });
+    }
+
+    // 🟧 فقاعة واحدة
+    function createTagChip(name, onRemove) {
+      const chip = document.createElement("div");
+      chip.textContent = name;
+      chip.style.cssText = `
+        background:#043B64;
+        color:white;
+        padding:5px 12px;
+        border-radius:20px;
+        display:flex;
+        align-items:center;
+        gap:6px;
+        font-size:13px;
+      `;
+      const removeBtn = document.createElement("span");
+      removeBtn.textContent = "✖";
+      removeBtn.style.cssText = "cursor:pointer;font-weight:bold;";
+      removeBtn.onclick = onRemove;
+      chip.appendChild(removeBtn);
+      return chip;
+    }
+
+    // 🔹 إنشاء القوائم المنسدلة عند الفتح
+    function setupDropdowns() {
+  // 🧹 تنظيف أي عناصر منسدلة مكررة قبل الإنشاء
+  ["city", "area", "product", "status"].forEach(id => {
+    const div = document.getElementById(id);
+    if (div) div.innerHTML = "";
+  });
+
+  const cityDiv = document.getElementById("city");
+  const areaDiv = document.getElementById("area");
+  const productDiv = document.getElementById("product");
+  const statusDiv = document.getElementById("status");
+
+      const cityDropdown = createDropdown(allCities, "", val => {
         areaDiv.innerHTML = "";
-        const areaDropdown = createDropdown(areas, "اختر المنطقة", () => {});
+        const newAreas = citiesData[val] || [];
+        const areaDropdown = createDropdown(newAreas, "", () => {});
         areaDiv.appendChild(areaDropdown);
       });
       cityDiv.appendChild(cityDropdown);
 
-      const areaDropdown = createDropdown([], "اختر المنطقة", () => {});
+      const areaDropdown = createDropdown([], "", () => {});
       areaDiv.appendChild(areaDropdown);
 
-      // 🔹 تحميل المنتجات من الريل تايم ووضعها في المنسدلة
-onValue(ref(db, "products"), (snap) => {
-  if (snap.exists()) {
-    const data = snap.val();
-    const allProducts = Object.values(data).map(p => p.name || p);
+      const productDropdown = createDropdown(allProducts, "", async val => {
+  renderProductTags();
 
-    productDiv.innerHTML = ""; // تنظيف الحقل قبل إعادة الإنشاء
-    const productDropdown = createDropdown(allProducts, "", () => {});
-    productDiv.appendChild(productDropdown);
-  }
+  // ✅ تحميل المتغيرات للمنتج الرئيسي
+  const mainCard = document.querySelector(".card"); // البطاقة الأساسية
+  mainProductObj = {}; // 🟢 استخدم المتغير العام بدل التعريف المحلي
+await loadVariantsForProduct(mainCard, val, mainProductObj);
+
 });
 
+      productDiv.appendChild(productDropdown);
 
       const statusOptions = ["", "مثبت", "قيد المعالجة", "قيد التجهيز", "بانتظار البضاعة", "قيد التوصيل", "تم التسليم", "راجع", "رفض"];
-      const statusDropdown = createDropdown(statusOptions, "اختر الحالة", () => {});
+      const statusDropdown = createDropdown(statusOptions, "", () => {});
       statusDiv.appendChild(statusDropdown);
     }
 
-   // 💾 حفظ الطلب
-document.getElementById("saveBtn").addEventListener("click", async () => {
-  // 👇 نجيب المستخدم الحالي من التخزين المحلي
-  const loggedUser = JSON.parse(localStorage.getItem("loggedInUser"));
+    // 💾 حفظ الطلب
+    document.getElementById("saveBtn").addEventListener("click", async () => {
+      const loggedUser = JSON.parse(localStorage.getItem("loggedInUser"));
 
-  const order = {
-    code: document.getElementById("code").value.trim(),
-    phone1: document.getElementById("phone1").value.trim(),
-    phone2: document.getElementById("phone2").value.trim(),
-    address: document.getElementById("address").value.trim(),
-    city: document.querySelector("#city input")?.value || "",
-    area: document.querySelector("#area input")?.value || "",
-    price: Number(document.getElementById("price").value),
-    quantity: Number(document.getElementById("quantity").value),
-    productName: document.querySelector("#product input")?.value || "",
-    notes: document.getElementById("notes").value.trim(),
-    status: document.querySelector("#status input")?.value || "",
-    advertiser: document.getElementById("advertiser").value.trim(),
-    orderDate: new Date().toISOString(),
+      const mainName = document.querySelector("#product input")?.value || "";
+      const mainQty = parseFloat(document.getElementById("quantity").value) || 0;
+      const mainPrice = parseFloat(document.getElementById("price").value) || 0;
 
-    // ✳️ الإضافات الجديدة المهمة:
-    fixedBy: loggedUser?.username || loggedUser?.name || "غير محدد",
-  // اسم الموظف اللي أضاف الطلب
-    updatedAt: new Date().toISOString()         // وقت آخر تعديل أو إضافة
-  };
+      const extraQty = extraProducts.reduce((sum, p) => sum + (p.qty || 0), 0);
+      const extraTotal = extraProducts.reduce((sum, p) => sum + ((p.qty || 0) * (p.price || 0)), 0);
 
-  if (!order.phone1 || !order.productName) {
-    alert("يرجى إدخال رقم الهاتف واسم المنتج على الأقل!");
-    return;
+      const totalQty = mainQty + extraQty;
+      const totalPrice = (mainQty * mainPrice) + extraTotal;
+
+      const combinedNames = [mainName, ...extraProducts.map(p => p.name)].filter(Boolean).join("، ");
+      // 🟢 إنشاء الملاحظات مع المتغيرات
+const notesArray = [];
+
+// المنتج الرئيسي
+if (mainName) {
+  let mainText = `${mainName} ×${mainQty}`;
+  if (Object.keys(mainProductObj?.selectedVariants || {}).length > 0) {
+    const vars = Object.entries(mainProductObj.selectedVariants)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ");
+    mainText += ` (${vars})`;
   }
+  notesArray.push(mainText);
+}
 
-  // 🚀 حفظ الطلب داخل Firebase Realtime Database
-  const newRef = push(ref(db, "orders"));
-  await set(newRef, order);
-
-  // 💬 عرض رسالة نجاح
-  const msg = document.getElementById("savedMsg");
-  msg.style.display = "block";
-  setTimeout(() => window.location.href = "orders.html", 1500);
+// المنتجات الإضافية
+extraProducts.forEach(p => {
+  let text = `${p.name} ×${p.qty}`;
+  if (Object.keys(p.selectedVariants || {}).length > 0) {
+    const vars = Object.entries(p.selectedVariants)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ");
+    text += ` (${vars})`;
+  }
+  notesArray.push(text);
 });
 
+const finalNotes = notesArray.join(" | ");
 
-    document.getElementById("backBtn").addEventListener("click", () => {
-      window.location.href = "orders.html";
+
+      // 🟢 بناء مصفوفة المنتجات بالتفصيل (للخصم من المخزون لاحقاً)
+const productsDetailed = [];
+
+// المنتج الرئيسي
+if (mainName) {
+  productsDetailed.push({
+    name: mainName,
+    qty: mainQty,
+    variants: mainProductObj.selectedVariants || {}
+  });
+}
+
+// المنتجات الإضافية
+extraProducts.forEach(p => {
+  if (p.name && p.qty > 0) {
+    productsDetailed.push({
+      name: p.name,
+      qty: p.qty,
+      variants: p.selectedVariants || {}
+    });
+  }
+});
+
+// 🟢 إنشاء الطلب
+const order = {
+  code: document.getElementById("code").value.trim(),
+  phone1: document.getElementById("phone1").value.trim(),
+  phone2: document.getElementById("phone2").value.trim(),
+  address: document.getElementById("address").value.trim(),
+  city: document.querySelector("#city input")?.value || "",
+  area: document.querySelector("#area input")?.value || "",
+  productName: combinedNames,
+  notes: finalNotes,
+  price: totalPrice,
+  quantity: totalQty,
+  status: document.querySelector("#status input")?.value || "",
+  advertiser: document.getElementById("advertiser").value.trim(),
+  orderDate: new Date().toISOString(),
+  fixedBy: loggedUser?.username || "غير محدد",
+  extraProducts: extraProducts,
+  productsDetailed: productsDetailed // ✅ هذا هو السطر الجديد المهم
+};
+// ✅ حفظ الطلب في Firebase
+const newRef = push(ref(db, "orders"));
+await set(newRef, order);
+
+// 🟢 عرض رسالة نجاح مؤقتة قبل الانتقال
+document.getElementById("savedMsg").style.display = "block";
+setTimeout(() => {
+  window.location.href = "orders.html";
+}, 800);
+
+
+// 🟢 دالة تخصم الكمية من المخزن مباشرة بعد إضافة الطلب
+async function updateStockImmediately(productsDetailed) {
+  const snap = await get(ref(db, "warehouse"));
+  if (!snap.exists()) return;
+
+  const warehouse = snap.val();
+
+  for (const item of productsDetailed) {
+    const { name, qty, variants } = item;
+    if (!name || !qty) continue;
+
+    const product = warehouse[name];
+    if (!product || !product.stock) {
+      console.warn(`⚠️ المنتج ${name} غير موجود في المخزن`);
+      continue;
+    }
+
+    const stock = product.stock;
+    const variantKey = Object.entries(variants)
+      .map(([k, v]) => `${k} | ${v}`)
+      .join(" | ");
+
+    let matchedKey = Object.keys(stock).find(k => k.trim() === variantKey.trim());
+
+    if (matchedKey && stock[matchedKey] !== undefined) {
+      const before = stock[matchedKey];
+      stock[matchedKey] = Math.max(0, before - qty);
+
+      console.log(`📦 خصم ${qty} من ${name} (${matchedKey}) | قبل: ${before} → بعد: ${stock[matchedKey]}`);
+
+      // تحديث المخزون والإجمالي
+      const totalQty = Object.entries(stock)
+        .filter(([k]) => k !== "إجمالي الكمية")
+        .reduce((sum, [, val]) => sum + (Number(val) || 0), 0);
+
+      await set(ref(db, `warehouse/${name}/stock`), stock);
+      await set(ref(db, `warehouse/${name}/totalQty`), totalQty);
+      console.log(`✅ تم تحديث ${name} بنجاح`);
+    } else {
+      console.warn(`⚠️ لم يتم العثور على متغير مطابق لـ ${name} (${variantKey})`);
+    }
+  }
+}
+
+// ✅ عرض رسالة نجاح مؤقتة قبل الانتقال
+document.getElementById("savedMsg").style.display = "block";
+setTimeout(() => {
+  window.location.href = "orders.html";
+}, 800);
+
     });
 
-    setupDropdowns();
   </script>
 </body>
 </html>

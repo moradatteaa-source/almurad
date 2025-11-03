@@ -5,6 +5,26 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>تفاصيل الطلب - نظام المراد</title>
   <style>
+    .add-small-btn {
+  background: rgba(4, 59, 100, 0.08);
+  color: #043B64;
+  border: 1px dashed #043B64;
+  border-radius: 8px;
+  padding: 6px 10px;
+  width: 55%;
+  font-size: 13px;
+  cursor: pointer;
+  margin: 8px auto;
+  display: block;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.add-small-btn:hover {
+  background: #043B64;
+  color: #fff;
+  transform: scale(1.03);
+}
+
     :root {
       --main-blue: #043B64;
       --accent-orange: #FF6B2D;
@@ -47,7 +67,7 @@
     .row {
       display: flex;
       justify-content: center;
-      gap: 25px; /* المسافة بين المربعات */
+      gap: 25px;
       flex-wrap: wrap;
       margin-bottom: 10px;
     }
@@ -58,13 +78,11 @@
       flex-direction: column;
     }
 
-    /* 🔹 الحقول الصغيرة المزدوجة */
     .field.small {
       flex: none;
       width: 140px;
     }
 
-    /* 🔹 الحقول المنفردة */
     .field.single {
       max-width: 280px;
       margin: 0 auto 15px auto;
@@ -175,11 +193,43 @@
         max-width: 100%;
       }
     }
-    /* 🔸 منع التقريب التلقائي بالموبايل */
-input, select, textarea {
-  font-size: 16px !important;
+
+    /* منع التقريب التلقائي بالموبايل */
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+
+    /* تنسيق المنتجات الإضافية */
+    .extra-product {
+  background: var(--background-gray);
+  border-radius: var(--border-radius);
+  padding: 15px 20px;
+  margin-top: 10px;
+  box-shadow: none;
 }
 
+.extra-product .row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 25px;
+  margin-bottom: 10px;
+}
+
+.extra-product .field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+
+    .delete-btn {
+      color: red;
+      cursor: pointer;
+      font-size: 20px;
+      text-align: left;
+    }
   </style>
 </head>
 
@@ -226,33 +276,63 @@ input, select, textarea {
     </div>
 
     <div class="card">
-      <div class="row">
-        <div class="field small">
-          <label>السعر:</label>
-          <input id="price" type="number">
-        </div>
-        <div class="field small">
-          <label>عدد القطع:</label>
-          <input id="quantity" type="number">
-        </div>
-      </div>
-    </div>
+  <div class="field single">
+    <label>اسم المنتج:</label>
+    <div id="product"></div>
+  </div>
+  <div id="productTagsContainer" style="
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:10px;
+"></div>
 
-    <div class="card">
-      <div class="field single">
-        <label>اسم المنتج:</label>
-        <div id="product"></div>
+  <div class="row">
+    <div class="field small">
+      <label>السعر:</label>
+      <input id="price" type="number">
+    </div>
+    <div class="field small">
+      <label>عدد القطع:</label>
+      <input id="quantity" type="number">
+    </div>
+  </div>
+</div>
+<div id="variantsContainer"></div>
+
+
+      <!-- المنتجات الإضافية -->
+      <div id="extraProducts"></div>
+
+      <!-- زر الإضافة -->
+<button id="addProductBtn" class="add-small-btn">➕ إضافة منتج آخر</button>
+
+      <!-- مجموع السعر والعدد (يظهر بعد إضافة منتج) -->
+      <div id="totalsCard" style="display:none;">
+        <div class="row">
+          <div class="field small">
+            <label>إجمالي العدد:</label>
+            <input id="totalQty" readonly>
+          </div>
+          <div class="field small">
+            <label>إجمالي السعر:</label>
+            <input id="totalPrice" readonly>
+          </div>
+        </div>
       </div>
+
       <div class="field single">
         <label>الملاحظات:</label>
         <textarea id="notes"></textarea>
       </div>
+
       <div class="field single">
         <label>تاريخ الطلب:</label>
         <input id="orderDate" readonly>
       </div>
     </div>
- <div class="card">
+
+    <div class="card">
       <div class="row">
         <div class="field small">
           <label>الحالة:</label>
@@ -273,9 +353,7 @@ input, select, textarea {
     <a id="callBtn" class="contact-btn" title="اتصال">📞</a>
     <a id="whatsappBtn" class="contact-btn whatsapp" title="واتساب">💬</a>
   </div>
-
-
-  <!-- سكربت الفايربيس -->
+    <!-- سكربت الفايربيس -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
     import { getDatabase, ref, get, update, onValue } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
@@ -295,6 +373,7 @@ input, select, textarea {
     const db = getDatabase(app);
     const orderId = localStorage.getItem("selectedOrder");
 
+    // 🔹 دالة إنشاء منسدلات (نفس الأصلية)
     function createDropdown(options, selected, onChange) {
       const wrapper = document.createElement("div");
       const input = document.createElement("input");
@@ -346,15 +425,276 @@ input, select, textarea {
       wrapper.appendChild(dropdown);
       return wrapper;
     }
+// ✅ تحميل المتغيرات الديناميكية للمنتج
+async function loadVariants(productName) {
+  const variantsContainer = document.getElementById("variantsContainer");
+  variantsContainer.innerHTML = ""; // تنظيف الحاوية أولاً
 
-    let allProducts = [];
-    onValue(ref(db, "products"), (snap) => {
-      if (snap.exists()) {
-        const data = snap.val();
-        allProducts = Object.values(data).map(p => p.name || p);
+  const snap = await get(ref(db, "warehouse"));
+  if (!snap.exists()) return;
+
+  const allProducts = snap.val();
+  const productData = allProducts[productName];
+  if (!productData || !productData.stock) return;
+
+  const stock = productData.stock;
+  const activeKeys = Object.keys(stock).filter(k => k !== "إجمالي الكمية" && stock[k] > 0);
+  if (activeKeys.length === 0) return;
+
+  // 🧩 استخراج كل أنواع المتغيرات (اللون، القياس، الخ)
+  const variantsMap = {};
+  activeKeys.forEach(key => {
+    const parts = key.split("|").map(s => s.trim());
+    for (let i = 0; i < parts.length; i += 2) {
+      const name = parts[i];
+      const val = parts[i + 1];
+      if (!variantsMap[name]) variantsMap[name] = new Set();
+      variantsMap[name].add(val);
+    }
+  });
+
+  const selected = {};
+
+  // 🔹 توليد المنسدلات تباعاً حسب الاختيارات
+  const variantNames = Object.keys(variantsMap);
+  if (variantNames.length === 0) return;
+
+  function renderDropdown(level = 0) {
+    // حذف أي قوائم بعد هذا المستوى
+    const oldNext = Array.from(variantsContainer.querySelectorAll(".variant-group"))
+      .filter((_, idx) => idx >= level);
+    oldNext.forEach(el => el.remove());
+
+    const name = variantNames[level];
+    if (!name) return;
+
+    // فلترة القيم بناءً على المتغيرات السابقة
+    const filteredKeys = activeKeys.filter(key =>
+      Object.entries(selected).every(([k, v]) => key.includes(`${k} | ${v}`))
+    );
+
+    const availableVals = new Set();
+    filteredKeys.forEach(key => {
+      const parts = key.split("|").map(s => s.trim());
+      for (let i = 0; i < parts.length; i += 2) {
+        const k = parts[i], val = parts[i + 1];
+        if (k === name) availableVals.add(val);
       }
     });
 
+    if (availableVals.size === 0) return;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "variant-group field single";
+    const label = document.createElement("label");
+    label.textContent = `${name}:`;
+    label.style.color = "#043B64";
+    label.style.fontWeight = "600";
+    label.style.marginTop = "8px";
+    wrapper.appendChild(label);
+
+    const dropdown = createDropdown([...availableVals], selected[name] || "", val => {
+      selected[name] = val;
+      update(ref(db, `orders/${orderId}/selectedVariants`), selected);
+      renderDropdown(level + 1); // توليد التالي
+    });
+    wrapper.appendChild(dropdown);
+    variantsContainer.appendChild(wrapper);
+  }
+
+  renderDropdown(0);
+}
+
+// ✅ تحميل المتغيرات الديناميكية للمنتج الإضافي مع الاعتماد على المتغير الأول
+async function loadVariantsForExtra(container, productName, productObj) {
+  const existingVariants = container.querySelector(".variants-container");
+  if (existingVariants) existingVariants.remove();
+
+  const variantsDiv = document.createElement("div");
+  variantsDiv.className = "variants-container";
+  variantsDiv.style.marginTop = "10px";
+
+  const snap = await get(ref(db, "warehouse"));
+  if (!snap.exists()) return;
+
+  const allProducts = snap.val();
+  const productData = allProducts[productName];
+  if (!productData || !productData.stock) return;
+
+  const stock = productData.stock;
+  const activeKeys = Object.keys(stock).filter(k => k !== "إجمالي الكمية" && stock[k] > 0);
+  if (activeKeys.length === 0) return;
+
+  const variantsMap = {};
+  activeKeys.forEach(key => {
+    const parts = key.split("|").map(s => s.trim());
+    for (let i = 0; i < parts.length; i += 2) {
+      const name = parts[i];
+      const val = parts[i + 1];
+      if (!variantsMap[name]) variantsMap[name] = new Set();
+      variantsMap[name].add(val);
+    }
+  });
+
+  const selected = {};
+  const variantNames = Object.keys(variantsMap);
+  if (variantNames.length === 0) return;
+
+  function renderDropdown(level = 0) {
+    // حذف القوائم بعد المستوى الحالي
+    const oldNext = Array.from(variantsDiv.querySelectorAll(".variant-group"))
+      .filter((_, idx) => idx >= level);
+    oldNext.forEach(el => el.remove());
+
+    const name = variantNames[level];
+    if (!name) return;
+
+    const filteredKeys = activeKeys.filter(key =>
+      Object.entries(selected).every(([k, v]) => key.includes(`${k} | ${v}`))
+    );
+
+    const availableVals = new Set();
+    filteredKeys.forEach(key => {
+      const parts = key.split("|").map(s => s.trim());
+      for (let i = 0; i < parts.length; i += 2) {
+        const k = parts[i], val = parts[i + 1];
+        if (k === name) availableVals.add(val);
+      }
+    });
+
+    if (availableVals.size === 0) return;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "variant-group field single";
+
+    const label = document.createElement("label");
+    label.textContent = `${name}:`;
+    label.style.color = "#043B64";
+    label.style.fontWeight = "600";
+    label.style.marginTop = "8px";
+    wrapper.appendChild(label);
+
+    const dropdown = createDropdown([...availableVals], selected[name] || "", val => {
+      selected[name] = val;
+      productObj.selectedVariants = selected;
+      renderDropdown(level + 1);
+    });
+    wrapper.appendChild(dropdown);
+    variantsDiv.appendChild(wrapper);
+  }
+
+  renderDropdown(0);
+  container.appendChild(variantsDiv);
+}
+
+
+
+    // 🔹 تحميل قائمة المنتجات من الفايربيس
+    let allProducts = [];
+onValue(ref(db, "warehouse"), (snap) => {
+      if (snap.exists()) {
+        const data = snap.val();
+allProducts = Object.keys(snap.val());
+      }
+    });
+
+    // 🟠 منتجات إضافية
+    let extraProducts = [];
+
+    // دالة إنشاء منتج إضافي
+    function addExtraProduct(product = { name: "", price: 0, qty: 0 }) {
+      const card = document.createElement("div");
+      card.className = "extra-product";
+
+      const nameField = document.createElement("div");
+      nameField.className = "field single";
+      const nameLabel = document.createElement("label");
+      nameLabel.textContent = "اسم المنتج:";
+      const dropdownContainer = document.createElement("div");
+     const dropdown = createDropdown(allProducts, product.name, val => {
+  product.name = val;
+  loadVariantsForExtra(card, val, product); // تحميل المتغيرات الخاصة بهذا المنتج
+  renderProductTags();
+
+})
+
+      dropdownContainer.appendChild(dropdown);
+      nameField.appendChild(nameLabel);
+      nameField.appendChild(dropdownContainer);
+
+      const row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML = `
+        <div class="field small">
+          <label>السعر:</label>
+          <input type="number" class="price-input" value="${product.price || ""}">
+        </div>
+        <div class="field small">
+          <label>العدد:</label>
+          <input type="number" class="qty-input" value="${product.qty || ""}">
+        </div>
+      `;
+
+      const del = document.createElement("div");
+      del.className = "delete-btn";
+      del.textContent = "🗑";
+      del.onclick = () => {
+        card.remove();
+        extraProducts = extraProducts.filter(p => p !== product);
+        updateTotals();
+        if (extraProducts.length === 0) {
+          document.getElementById("totalsCard").style.display = "none";
+        }
+      };
+
+      card.appendChild(nameField);
+      card.appendChild(row);
+      card.appendChild(del);
+      document.getElementById("extraProducts").appendChild(card);
+
+      const priceInput = row.querySelector(".price-input");
+      const qtyInput = row.querySelector(".qty-input");
+
+      priceInput.addEventListener("input", () => {
+        product.price = parseFloat(priceInput.value) || 0;
+        updateTotals();
+      });
+      qtyInput.addEventListener("input", () => {
+        product.qty = parseFloat(qtyInput.value) || 0;
+        updateTotals();
+      });
+
+      extraProducts.push(product);
+      updateTotals();
+      document.getElementById("totalsCard").style.display = "block";
+    }
+
+    // 🔹 تحديث المجموع
+   function updateTotals() {
+  // 🔹 بيانات المنتج الأساسي
+  const mainQty = parseFloat(document.getElementById("quantity").value) || 0;
+  const mainPrice = parseFloat(document.getElementById("price").value) || 0;
+  const mainTotal = mainQty * mainPrice;
+
+  // 🔹 مجموع المنتجات الإضافية
+  const extraQty = extraProducts.reduce((sum, p) => sum + (p.qty || 0), 0);
+  const extraTotal = extraProducts.reduce((sum, p) => sum + ((p.qty || 0) * (p.price || 0)), 0);
+
+  // 🔹 الجمع الكلي
+  const totalQty = mainQty + extraQty;
+  const totalPrice = mainTotal + extraTotal;
+
+  document.getElementById("totalQty").value = totalQty;
+  document.getElementById("totalPrice").value = totalPrice.toFixed(0);
+}
+
+
+    // 🔸 زر الإضافة
+    document.getElementById("addProductBtn").addEventListener("click", () => {
+      addExtraProduct();
+    });
+
+    // 🔹 تحميل الطلب
     async function loadOrder() {
       const snapshot = await get(ref(db, `orders/${orderId}`));
       if (!snapshot.exists()) return;
@@ -364,25 +704,20 @@ input, select, textarea {
       document.getElementById("phone1").value = data.phone1 || "";
       document.getElementById("phone2").value = data.phone2 || "";
       document.getElementById("address").value = data.address || "";
-      document.getElementById("price").value = data.price || "";
-      document.getElementById("quantity").value = data.quantity || "";
       document.getElementById("notes").value = data.notes || "";
       document.getElementById("advertiser").value = data.advertiser || "";
       document.getElementById("orderDate").value = data.orderDate || "-";
+      document.getElementById("price").value = data.price || "";
+      document.getElementById("quantity").value = data.quantity || "";
 
+      // إعداد واتساب واتصال
       const phone = data.phone1 || "";
       document.getElementById("callBtn").href = `tel:${phone}`;
-let normalizedPhone = phone.toString().trim()
-  .replace(/[^\d]/g, '')
-  .replace(/^0+/, '');
+      let normalizedPhone = phone.toString().trim().replace(/[^\d]/g, '').replace(/^0+/, '');
+      if (!normalizedPhone.startsWith('964')) normalizedPhone = '964' + normalizedPhone;
+      document.getElementById("whatsappBtn").onclick = () => window.open(`https://wa.me/${normalizedPhone}`, "_blank");
 
-if (!normalizedPhone.startsWith('964'))
-  normalizedPhone = '964' + normalizedPhone;
-
-document.getElementById("whatsappBtn").onclick = () => {
-  window.open(`https://wa.me/${normalizedPhone}`, "_blank");
-};
-
+      // المدينة والمنطقة
       const cityDiv = document.getElementById("city");
       const areaDiv = document.getElementById("area");
       const cityDropdown = createDropdown(allCities, data.city || "", val => {
@@ -398,47 +733,366 @@ document.getElementById("whatsappBtn").onclick = () => {
       const areaDropdown = createDropdown(areas, data.area || "", val => update(ref(db, `orders/${orderId}`), { area: val }));
       areaDiv.appendChild(areaDropdown);
 
+      // المنتج الرئيسي
       const productDiv = document.getElementById("product");
-      const productDropdown = createDropdown(allProducts, data.productName || "", val => update(ref(db, `orders/${orderId}`), { productName: val }));
+const productDropdown = createDropdown(allProducts, data.productName || "", val => {
+  update(ref(db, `orders/${orderId}`), { productName: val });
+  loadVariants(val); // تحميل المتغيرات حسب المنتج
+});
       productDiv.appendChild(productDropdown);
 
+      // الحالة
       const statusDiv = document.getElementById("status");
-const statusOptions = [
-  "",
-  "مثبت",
-  "قيد المعالجة",
-  "قيد التجهيز",
-  "بانتظار البضاعة",
-  "قيد التوصيل",
-  "تم التسليم",
-  "راجع",
-  "رفض"
-];
+      const statusOptions = ["", "مثبت", "قيد المعالجة", "قيد التجهيز", "بانتظار البضاعة", "قيد التوصيل", "تم التسليم", "راجع", "رفض"];
       const statusDropdown = createDropdown(statusOptions, data.status || "", val => update(ref(db, `orders/${orderId}`), { status: val }));
       statusDiv.appendChild(statusDropdown);
+
+      // تحميل المنتجات الإضافية القديمة (إن وجدت)
+      if (data.extraProducts && Array.isArray(data.extraProducts)) {
+        data.extraProducts.forEach(p => addExtraProduct(p));
+      }
     }
 
-    document.getElementById("saveBtn").addEventListener("click", async () => {
-      const updates = {
-        code: document.getElementById("code").value.trim(),
-        phone1: document.getElementById("phone1").value.trim(),
-        phone2: document.getElementById("phone2").value.trim(),
-        address: document.getElementById("address").value.trim(),
-        price: document.getElementById("price").value.trim(),
-        quantity: document.getElementById("quantity").value.trim(),
-        notes: document.getElementById("notes").value.trim(),
-        advertiser: document.getElementById("advertiser").value.trim()
-      };
-      await update(ref(db, `orders/${orderId}`), updates);
-      window.location.href = "orders.html";
-    });
+    // 🔹 عند الحفظ
+   // 🔹 عند الحفظ
+document.getElementById("saveBtn").addEventListener("click", async () => {
+  // المنتج الرئيسي
+  const mainProduct = {
+    name: document.getElementById("product").querySelector("input").value.trim(),
+    price: parseFloat(document.getElementById("price").value) || 0,
+    qty: parseFloat(document.getElementById("quantity").value) || 0,
+  };
 
-    document.getElementById("backBtn").addEventListener("click", () => {
-  window.parent.postMessage("closeDetailsModal", "*");
+  // المتغيرات للمنتج الرئيسي (من selectedVariants داخل قاعدة البيانات)
+  const mainSnap = await get(ref(db, `orders/${orderId}/selectedVariants`));
+  const mainVariants = mainSnap.exists() ? mainSnap.val() : {};
+
+ // 🧩 بناء الملاحظات وهيكل تفصيلي للمنتجات
+const notesArray = [];
+const productsDetailed = [];
+
+// المنتج الرئيسي
+if (mainProduct.name) {
+  let varsText = "";
+  const variantsObj = mainVariants || {};
+  if (Object.keys(variantsObj).length > 0) {
+    const varsArr = Object.entries(variantsObj).map(([k, v]) => `${k}: ${v}`);
+    varsText = ` (${varsArr.join("، ")})`;
+  }
+
+  notesArray.push(`${mainProduct.name} ×${mainProduct.qty}${varsText}`);
+  productsDetailed.push({
+    name: mainProduct.name,
+    qty: mainProduct.qty,
+    variants: variantsObj
+  });
+}
+
+// المنتجات الإضافية
+extraProducts.forEach(p => {
+  let varsText = "";
+  const variantsObj = p.selectedVariants || {};
+  if (Object.keys(variantsObj).length > 0) {
+    const varsArr = Object.entries(variantsObj).map(([k, v]) => `${k}: ${v}`);
+    varsText = ` (${varsArr.join("، ")})`;
+  }
+
+  notesArray.push(`${p.name} ×${p.qty}${varsText}`);
+  productsDetailed.push({
+    name: p.name,
+    qty: p.qty,
+    variants: variantsObj
+  });
 });
 
-    await loadOrder();
-    
+// 🔹 الملاحظات النهائية
+const finalNotes = notesArray.join(" | ");
+
+
+
+  // 🔹 حساب الإجماليات
+  const mainTotal = mainProduct.qty * mainProduct.price;
+  const extraQty = extraProducts.reduce((sum, p) => sum + (p.qty || 0), 0);
+  const extraTotal = extraProducts.reduce((sum, p) => sum + ((p.qty || 0) * (p.price || 0)), 0);
+
+  const totalQty = mainProduct.qty + extraQty;
+  const totalPrice = mainTotal + extraTotal;
+
+  // 🔹 توليد اسم المنتج الموحّد (فقط الأسماء بدون عدد)
+  const combinedProductNames = [];
+  if (mainProduct.name) combinedProductNames.push(mainProduct.name);
+  if (extraProducts.length > 0) {
+    extraProducts.forEach(p => combinedProductNames.push(p.name));
+  }
+  const finalProductName = combinedProductNames.join("، ");
+
+  // 🔸 تجهيز البيانات للحفظ
+ const updates = {
+  code: document.getElementById("code").value.trim(),
+  phone1: document.getElementById("phone1").value.trim(),
+  phone2: document.getElementById("phone2").value.trim(),
+  address: document.getElementById("address").value.trim(),
+  productName: finalProductName,
+  notes: finalNotes,
+  advertiser: document.getElementById("advertiser").value.trim(),
+  price: totalPrice,
+  quantity: totalQty,
+  extraProducts: extraProducts,
+  selectedVariants: mainVariants,
+  productsDetailed: productsDetailed // ✅ تمت إضافته هنا
+};
+
+// ✅ حفظ مباشر بدون أي alert
+await update(ref(db, `orders/${orderId}`), updates);
+
+// ✅ لو الحالة الجديدة هي قيد التوصيل أو تم استلام الراجع، نحدث المخزون
+const newStatusInput = document.getElementById("status").querySelector("input");
+const newStatus = newStatusInput ? newStatusInput.value.trim() : "";
+
+if (["قيد التوصيل", "تم استلام الراجع"].includes(newStatus)) {
+  console.log("🔥 تم استدعاء دالة تحديث المخزون من صفحة التفاصيل:", newStatus);
+  await adjustStockOnStatusChange(orderId, newStatus);
+}
+
+// ✅ بعد الحفظ، نرجع المستخدم لنفس الحالة والمكان القديم تماماً
+const lastStatus = localStorage.getItem("lastStatusView");
+const lastScroll = localStorage.getItem("previousScrollPosition");
+
+if (lastStatus) {
+  // نرسل الحالة بالرابط حتى يعرض نفس الصفحة القديمة
+  localStorage.setItem("restoreScrollAfterReturn", lastScroll || "0");
+  window.location.href = `orders.html?status=${encodeURIComponent(lastStatus)}`;
+} else {
+  window.location.href = "orders.html";
+}
+
+}); // ← أضف هذا القوس هنا لإغلاق event listener
+
+
+
+
+  document.addEventListener("DOMContentLoaded", async () => {
+  await loadOrder();
+});
+
+    // 🟦 عرض أسماء المنتجات كفقاعات داخل حقل "اسم المنتج"
+function renderProductTags() {
+  const container = document.getElementById("productTagsContainer");
+  container.innerHTML = "";
+
+  // المنتج الرئيسي
+  const mainName = document.getElementById("product").querySelector("input").value.trim();
+  if (mainName) {
+    const chip = createTagChip(mainName, () => {
+      document.getElementById("product").querySelector("input").value = "";
+      renderProductTags();
+    });
+    container.appendChild(chip);
+  }
+
+  // المنتجات الإضافية
+  extraProducts.forEach((p, i) => {
+    if (p.name) {
+      const chip = createTagChip(p.name, () => {
+        extraProducts.splice(i, 1);
+        renderProductTags();
+      });
+      container.appendChild(chip);
+    }
+  });
+}
+
+// 🟧 إنشاء فقاعة المنتج الواحدة
+function createTagChip(name, onRemove) {
+  const chip = document.createElement("div");
+  chip.textContent = name;
+  chip.style.cssText = `
+    background:#043B64;
+    color:white;
+    padding:5px 12px;
+    border-radius:20px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:13px;
+  `;
+
+  const removeBtn = document.createElement("span");
+  removeBtn.textContent = "✖";
+  removeBtn.style.cssText = "cursor:pointer;font-weight:bold;";
+  removeBtn.onclick = onRemove;
+  chip.appendChild(removeBtn);
+
+  return chip;
+}
+// 🔙 زر الرجوع إلى لوحة الطلبات
+document.getElementById("backBtn").addEventListener("click", () => {
+const lastStatus = localStorage.getItem("lastStatusView");
+if (lastStatus) {
+  window.location.href = `orders.html?status=${encodeURIComponent(lastStatus)}`;
+} else {
+// 🔙 بعد الحفظ، نرجع المستخدم لنفس الحالة السابقة
+const params = new URLSearchParams(window.location.search);
+const lastStatus = params.get("status") || localStorage.getItem("lastStatusView");
+
+if (lastStatus) {
+  window.location.href = `orders.html?status=${encodeURIComponent(lastStatus)}`;
+} else {
+  window.location.href = "orders.html";
+}
+}
+});
+// ✅ تحديث شامل للمخزون عند تغيير حالة الطلب (يدعم كل الحالات)
+window.adjustStockOnStatusChange = async function(orderId, newStatus) {
+  const db = getDatabase();
+  const orderRef = ref(db, `orders/${orderId}`);
+  const orderSnap = await get(orderRef);
+  if (!orderSnap.exists()) return;
+
+  const order = orderSnap.val();
+  console.log("🔥 تحديث المخزون بناءً على حالة الطلب:", orderId, newStatus);
+
+  // 🧩 تجميع المنتجات سواء فيها متغيرات أو لا
+  const products = [];
+  const detailedArr = order.productsDetailed
+    ? Array.isArray(order.productsDetailed)
+      ? order.productsDetailed
+      : Object.values(order.productsDetailed)
+    : [];
+
+  // ✅ نحصل من productsDetailed أو من الحقول القديمة
+  if (detailedArr.length > 0) {
+    detailedArr.forEach(p => {
+      const hasVariants = p.variants && Object.keys(p.variants).length > 0;
+      const variantKey = hasVariants
+        ? Object.entries(p.variants)
+            .map(([k, v]) => `${k}:${v}`)
+            .join(" | ")
+        : "بدون_متغير";
+      products.push({
+        name: p.name?.trim() || "",
+        qty: parseInt(p.qty) || 0,
+        variants: hasVariants ? p.variants : {},
+        variantKey,
+      });
+    });
+  } else {
+    if (order.productName) {
+      products.push({
+        name: order.productName?.trim() || "",
+        qty: parseInt(order.quantity) || 0,
+        variants: order.selectedVariants || {},
+        variantKey:
+          order.selectedVariants && Object.keys(order.selectedVariants).length > 0
+            ? Object.entries(order.selectedVariants)
+                .map(([k, v]) => `${k}:${v}`)
+                .join(" | ")
+            : "بدون_متغير",
+      });
+    }
+
+    if (order.extraProducts && Array.isArray(order.extraProducts)) {
+      order.extraProducts.forEach(p => {
+        const hasVariants = p.selectedVariants && Object.keys(p.selectedVariants).length > 0;
+        const variantKey = hasVariants
+          ? Object.entries(p.selectedVariants)
+              .map(([k, v]) => `${k}:${v}`)
+              .join(" | ")
+          : "بدون_متغير";
+        products.push({
+          name: p.name?.trim() || "",
+          qty: parseInt(p.qty) || 0,
+          variants: hasVariants ? p.selectedVariants : {},
+          variantKey,
+        });
+      });
+    }
+  }
+
+  // ✅ تنفيذ الخصم أو الإرجاع لكل منتج بغض النظر عن وجود متغيرات
+  for (const item of products) {
+    const { name, qty, variantKey } = item;
+    if (!name || qty <= 0) continue;
+
+    const warehouseRef = ref(db, `warehouse/${name}`);
+    const warehouseSnap = await get(warehouseRef);
+    if (!warehouseSnap.exists()) {
+      console.warn(`🚫 المنتج "${name}" غير موجود في المخزن`);
+      continue;
+    }
+
+    const warehouse = warehouseSnap.val();
+    const stock = warehouse.stock || {};
+    const processed = warehouse.processedOrders || {};
+    let totalQty = Number(warehouse.totalQty || 0);
+
+    // 🧠 مطابقة مرنة لأسماء المتغيرات
+    let foundKey = null;
+    const normalize = t =>
+      t.replace(/\s+/g, "").replace(/[|:،]/g, "").toLowerCase();
+    const targetVariant = normalize(variantKey);
+
+    for (const key of Object.keys(stock)) {
+      const nk = normalize(key);
+      if (nk.includes(targetVariant) || targetVariant.includes(nk)) {
+        foundKey = key;
+        break;
+      }
+    }
+
+    // 🧩 مفتاح تتبع فريد لتجنب التكرار
+    const variantId = variantKey ? variantKey.replace(/\s+/g, "_") : "default";
+    const actionKey = `${newStatus}_${orderId}_${name}_${variantId}`;
+
+    if (processed[actionKey]) {
+      console.log(`⏩ تم معالجة ${actionKey} مسبقًا، تجاهل.`);
+      continue;
+    }
+
+    // ✅ خصم أو إرجاع حسب الحالة
+    if (newStatus === "قيد التوصيل") {
+      if (foundKey && stock[foundKey] !== undefined) {
+        stock[foundKey] = Math.max(0, stock[foundKey] - qty);
+        console.log(`📦 خصم ${qty} من ${name} (${foundKey})`);
+      } else if (stock["إجمالي الكمية"] !== undefined) {
+        stock["إجمالي الكمية"] = Math.max(0, stock["إجمالي الكمية"] - qty);
+        console.log(`📦 خصم ${qty} من ${name} (إجمالي الكمية)`);
+      }
+    }
+
+    if (newStatus === "تم استلام الراجع") {
+      if (foundKey && stock[foundKey] !== undefined) {
+        stock[foundKey] += qty;
+        console.log(`🔁 إرجاع ${qty} إلى ${name} (${foundKey})`);
+      } else if (stock["إجمالي الكمية"] !== undefined) {
+        stock["إجمالي الكمية"] += qty;
+        console.log(`🔁 إرجاع ${qty} إلى ${name} (إجمالي الكمية)`);
+      }
+    }
+
+    // 🧾 تسجيل العملية
+    processed[actionKey] = true;
+    totalQty = Object.values(stock).reduce((a, b) => a + (b || 0), 0);
+
+    await update(warehouseRef, {
+      stock,
+      totalQty,
+      processedOrders: processed,
+      lastUpdate: new Date().toISOString(),
+    });
+
+    console.log(`✅ تم تحديث ${name} (${variantKey}) بنجاح`);
+  }
+};
+// 🧭 استرجاع موضع التمرير بعد العودة من التفاصيل
+document.addEventListener("DOMContentLoaded", () => {
+  const savedScroll = localStorage.getItem("restoreScrollAfterReturn");
+  if (savedScroll) {
+    window.scrollTo(0, parseInt(savedScroll));
+    localStorage.removeItem("restoreScrollAfterReturn");
+  }
+});
+
   </script>
 </body>
 </html>
