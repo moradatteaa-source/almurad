@@ -145,6 +145,27 @@ input, select, textarea {
 .show {
   display: block;
 }
+/* 🔔 إشعار علوي أنيق */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: #FF6B2D;
+  color: #fff;
+  padding: 14px 22px;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.25);
+  font-family: 'Tajawal', sans-serif;
+  font-size: 16px;
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.notification.show {
+  opacity: 1;
+  transform: translateY(0);
+}
 
   </style>
 </head>
@@ -227,7 +248,17 @@ async function ensureOrderDetailsSaved(orderId) {
   const order = snap.val();
 
   // لو أصلاً موجود productsDetailed، ما نسوي شي
-  if (order.productsDetailed && Array.isArray(order.productsDetailed) && order.productsDetailed.length > 0) return;
+// لو ماكو بيانات فعلية داخل productsDetailed نعيد توليدها
+if (
+  !order.productsDetailed ||
+  !Array.isArray(order.productsDetailed) ||
+  order.productsDetailed.length === 0 ||
+  !order.productsDetailed[0]?.name
+) {
+  // نكمل توليد التفاصيل أدناه
+} else {
+  return; // موجودة بيانات فعلية، نطلع
+}
 
   // نجهز بيانات المنتج
   const productName = order.productName || "";
@@ -246,8 +277,7 @@ async function ensureOrderDetailsSaved(orderId) {
   console.log(`💾 تم حفظ تفاصيل الطلب ${orderId} تلقائياً`);
 }
 
-// ✅ تعريف عالمي لدالة تحديث المخزون
-window.adjustStockOnStatusChange = async function(orderId, newStatus) {
+window.adjustStockOnStatusChange = async function (orderId, newStatus) {
   const db = getDatabase();
   const orderRef = ref(db, `orders/${orderId}`);
   const orderSnap = await get(orderRef);
@@ -256,72 +286,47 @@ window.adjustStockOnStatusChange = async function(orderId, newStatus) {
 
   console.log("🔥 تحديث المخزون بناءً على حالة الطلب:", orderId, newStatus);
 
-// ✅ تحديد المنتجات سواء فيها متغيرات أو لا
-const products = [];
+  // 🧩 تجميع جميع المنتجات (الرئيسي + الإضافي)
+  const products = [];
 
-if (order.productsDetailed) {
-  // نحول إلى مصفوفة مهما كان الشكل (Array أو Object)
-  const detailedArr = Array.isArray(order.productsDetailed)
-    ? order.productsDetailed
-    : Object.values(order.productsDetailed);
-
-  detailedArr.forEach(p => {
-    // إذا المنتج بي متغيرات نحتفظ بيها، إذا لا نستخدم "بدون متغير"
-    const hasVariants = p.variants && Object.keys(p.variants).length > 0;
+  function addProduct(name, qty, variants) {
+    if (!name || isNaN(qty)) return;
+    const cleanName = name.trim();
+    const hasVariants = variants && Object.keys(variants).length > 0;
     const variantKey = hasVariants
-      ? Object.entries(p.variants)
-          .map(([k, v]) => `${k}:${v}`)
-          .join("_")
-      : "بدون_متغير";
+      ? Object.entries(variants)
+          .map(([k, v]) => `${k} | ${v}`)
+          .join(" | ")
+      : "بدون متغير";
+    products.push({ name: cleanName, qty, variantKey, variants });
+  }
 
-    products.push({
-      name: p.name || "منتج غير معروف",
-      qty: parseInt(p.qty) || 1,
-      variantKey: variantKey,
-      variants: hasVariants ? p.variants : {}
-    });
-  });
-} else {
-  // الطلبات القديمة بدون تفاصيل
-  if (order.productName) {
-    products.push({
-      name: order.productName.split("،")[0].trim(),
-      qty: parseInt(order.quantity) || 1,
-      variantKey: "بدون_متغير",
-      variants: order.selectedVariants || {}
+  // 🟢 المنتج الأساسي
+  if (order.productName && order.quantity) {
+    addProduct(order.productName, parseInt(order.quantity), order.selectedVariants || {});
+  }
+
+  // 🟢 المنتجات الإضافية (extraProducts)
+  if (Array.isArray(order.extraProducts)) {
+    order.extraProducts.forEach((p) => {
+      addProduct(p.name, parseInt(p.qty) || 1, p.selectedVariants || {});
     });
   }
 
-  if (order.extraProducts && Array.isArray(order.extraProducts)) {
-    order.extraProducts.forEach(p => {
-      const hasVariants = p.selectedVariants && Object.keys(p.selectedVariants).length > 0;
-      const variantKey = hasVariants
-        ? Object.entries(p.selectedVariants)
-            .map(([k, v]) => `${k}:${v}`)
-            .join("_")
-        : "بدون_متغير";
-
-      products.push({
-        name: p.name,
-        qty: parseInt(p.qty) || 1,
-        variantKey: variantKey,
-        variants: hasVariants ? p.selectedVariants : {}
-      });
+  // 🟢 productsDetailed (في حال التخزين المسبق)
+  if (Array.isArray(order.productsDetailed)) {
+    order.productsDetailed.forEach((p) => {
+      addProduct(p.name, parseInt(p.qty) || 1, p.variants || {});
     });
   }
-}
 
-
-
-  // 🧩 تنفيذ التعديل على كل منتج فعلي
+  // 🧱 نبدأ تحديث كل منتج بالمخزن
   for (const item of products) {
-    const { name, qty, variants } = item;
-    if (!name || isNaN(qty)) continue;
-
+    const { name, qty, variantKey, variants } = item;
     const warehouseRef = ref(db, `warehouse/${name}`);
     const warehouseSnap = await get(warehouseRef);
     if (!warehouseSnap.exists()) {
-      console.log(`🚫 المنتج "${name}" غير موجود في المخزن`);
+      console.warn(`🚫 المنتج "${name}" غير موجود في المخزن`);
       continue;
     }
 
@@ -330,82 +335,112 @@ if (order.productsDetailed) {
     const processed = warehouse.processedOrders || {};
     let totalQty = parseInt(warehouse.totalQty || 0);
 
-    // 🧠 بناء المفتاح الحقيقي للمتغيرات (إن وُجدت)
-    let variantKey = null;
-    if (variants && Object.keys(variants).length > 0) {
-      const parts = [];
-      if (variants["القياس"]) parts.push(`القياس: ${variants["القياس"]}`);
-      if (variants["اللون"]) parts.push(`اللون: ${variants["اللون"]}`);
-      variantKey = parts.join(" | ");
-    }
+   // 🧠 البحث عن المفتاح الصحيح داخل المخزون
+let foundKey = null;
 
-    // 🔍 محاولة إيجاد المفتاح داخل stock
-    let foundKey = null;
-    if (variantKey) {
-      const normalize = (t) =>
-        t.replace(/\s+/g, "")
-         .replace(/[|:،]/g, "")
-         .replace(/اللون/g, "")
-         .replace(/القياس/g, "")
-         .toLowerCase();
-      const vk = normalize(variantKey);
-      for (const key of Object.keys(stock)) {
-        const nk = normalize(key);
-        if (nk.includes(vk) || vk.includes(nk)) {
-          foundKey = key;
-          break;
-        }
-      }
-    }
+// نكوّن مصفوفة تحتوي على كل القيم من المتغيرات (مثل اللون، الحجم، الشكل، القياس)
+const variantValues = Object.values(variants || {}).map(v => v.trim().toLowerCase());
 
-    if (newStatus === "قيد التوصيل" && !processed[`deduct_${orderId}_${name}`]) {
-  if (foundKey && stock[foundKey] !== undefined) {
-    // ✅ خصم من المتغير المحدد
-    stock[foundKey] = Math.max(0, stock[foundKey] - qty);
-    console.log(`📦 خصم ${qty} من ${name} (${foundKey})`);
-  } else if (stock["إجمالي الكمية"] !== undefined) {
-    // ✅ خصم مباشر من إجمالي الكمية
-    stock["إجمالي الكمية"] = Math.max(0, stock["إجمالي الكمية"] - qty);
-    console.log(`📦 خصم ${qty} من ${name} (إجمالي الكمية)`);
-  } else {
-    // ⚠️ كحل احتياطي
-    totalQty = Math.max(0, totalQty - qty);
-    console.log(`📦 خصم ${qty} من ${name} (من الإجمالي فقط)`);
+// نبحث داخل كل مفتاح من مفاتيح الـ stock
+for (const key of Object.keys(stock)) {
+  const normalizedKey = key.trim().toLowerCase();
+
+  // نحسب كم قيمة من المتغيرات موجودة داخل المفتاح
+  const matches = variantValues.filter(v => normalizedKey.includes(v)).length;
+
+  // إذا المفتاح يحتوي على كل القيم المطلوبة من المتغيرات → هذا هو المطلوب
+  if (matches === variantValues.length && matches > 0) {
+    foundKey = key;
+    break;
   }
-const variantId = variantKey ? variantKey.replace(/\s+/g, "_") : "default";
-processed[`deduct_${orderId}_${name}_${variantId}`] = true;
 }
 
 
-   if (newStatus === "تم استلام الراجع" && !processed[`return_${orderId}_${name}`]) {
+    // 🧩 توليد مفتاح فريد للطلب حتى لا يتكرر الخصم أو الإرجاع
+    const variantId = variantKey.replace(/\s+/g, "_");
+    const uniqueKey = `${orderId}_${name}_${variantId}`;
+
+// ✅ الخصم عند قيد التوصيل
+if (newStatus === "قيد التوصيل" && !processed[`deduct_${uniqueKey}`]) {
+  if (foundKey && stock[foundKey] !== undefined) {
+    // 🧩 إذا المنتج بي متغيرات ومفتاح مطابق
+    stock[foundKey] = Math.max(0, stock[foundKey] - qty);
+    console.log(`📦 خصم ${qty} من ${name} (${foundKey})`);
+    processed[`deduct_${uniqueKey}`] = true;
+  } 
+  else if (!foundKey && (!variants || Object.keys(variants).length === 0)) {
+    // 🟢 منتج بدون متغيرات → يخصم من إجمالي الكمية
+    if (stock["إجمالي الكمية"] !== undefined) {
+      stock["إجمالي الكمية"] = Math.max(0, stock["إجمالي الكمية"] - qty);
+      console.log(`📦 خصم ${qty} من ${name} (إجمالي الكمية)`);
+      processed[`deduct_${uniqueKey}`] = true;
+    } else {
+      showNotification(`🚫 المنتج "${name}" لا يحتوي على متغيرات أو إجمالي كميات.`, "#FF6B2D");
+      continue;
+    }
+  } 
+  else {
+    // 🚫 لا متغير ولا تطابق
+    showNotification(`🚫 لم يتم العثور على المتغير "${name}" أو أنه نفد من المخزون!`, "#FF6B2D");
+    continue;
+  }
+}
+
+// ✅ الإرجاع عند تم استلام الراجع
+if (newStatus === "تم استلام الراجع" && !processed[`return_${uniqueKey}`]) {
   if (foundKey && stock[foundKey] !== undefined) {
     stock[foundKey] += qty;
     console.log(`🔁 إرجاع ${qty} إلى ${name} (${foundKey})`);
-  } else if (stock["إجمالي الكمية"] !== undefined) {
-    stock["إجمالي الكمية"] += qty;
-    console.log(`🔁 إرجاع ${qty} إلى ${name} (إجمالي الكمية)`);
-  } else {
-    totalQty += qty;
-    console.log(`🔁 إرجاع ${qty} إلى ${name} (إجمالي فقط)`);
+    processed[`return_${uniqueKey}`] = true;
+  } 
+  else if (!foundKey && (!variants || Object.keys(variants).length === 0)) {
+    if (stock["إجمالي الكمية"] !== undefined) {
+      stock["إجمالي الكمية"] += qty;
+      console.log(`🔁 إرجاع ${qty} إلى ${name} (إجمالي الكمية)`);
+      processed[`return_${uniqueKey}`] = true;
+    } else {
+      showNotification(`⚠️ لا يمكن إرجاع "${name}" لأن المنتج لا يحتوي على متغيرات.`, "#043B64");
+      continue;
+    }
+  } 
+  else {
+    showNotification(`⚠️ لا يمكن إرجاع "${name}" لأن المتغير غير موجود بالمخزون.`, "#043B64");
+    continue;
   }
-processed[`return_${orderId}_${name}_${variantId}`] = true;
 }
 
 
-    // 🔄 إعادة حساب الإجمالي من جميع المتغيرات
-    totalQty = Object.values(stock).reduce((a, b) => a + b, 0);
 
-    // 💾 تحديث المخزن
+    // ✅ الإرجاع عند تم استلام الراجع
+    if (newStatus === "تم استلام الراجع" && !processed[`return_${uniqueKey}`]) {
+      if (foundKey && stock[foundKey] !== undefined) {
+        stock[foundKey] += qty;
+        console.log(`🔁 إرجاع ${qty} إلى ${name} (${foundKey})`);
+      } else if (stock["إجمالي الكمية"] !== undefined) {
+        stock["إجمالي الكمية"] += qty;
+        console.log(`🔁 إرجاع ${qty} إلى ${name} (إجمالي الكمية)`);
+      } else {
+        totalQty += qty;
+        console.log(`🔁 إرجاع ${qty} إلى ${name} (إجمالي فقط)`);
+      }
+      processed[`return_${uniqueKey}`] = true;
+    }
+
+    // ♻️ إعادة حساب الإجمالي من كل المتغيرات
+    totalQty = Object.values(stock).reduce((a, b) => a + (parseInt(b) || 0), 0);
+
+    // 💾 تحديث البيانات بالمخزن
     await update(warehouseRef, {
       stock,
       totalQty,
       processedOrders: processed,
-      lastUpdate: new Date().toISOString()
+      lastUpdate: new Date().toISOString(),
     });
 
     console.log(`✅ تم تحديث ${name}`, { totalQty, stock });
   }
 };
+
 
 
 
@@ -650,10 +685,21 @@ function createDropdown(options, selected, onChange) {
       window.currentOpenDropdown.style.display = "none";
     }
 
-    const rect = input.getBoundingClientRect();
-    dropdown.style.top = rect.bottom + "px";
-    dropdown.style.left = rect.left + "px";
-    dropdown.style.width = rect.width + "px";
+ const rect = input.getBoundingClientRect();
+const viewportHeight = window.innerHeight;
+const spaceBelow = viewportHeight - rect.bottom;
+const dropdownHeight = 200; // نفس maxHeight بالـ CSS
+
+// إذا ماكو مساحة كافية أسفل، خليه يطلع فوق
+if (spaceBelow < dropdownHeight) {
+  dropdown.style.top = (rect.top - dropdownHeight) + "px";
+} else {
+  dropdown.style.top = rect.bottom + "px";
+}
+
+dropdown.style.left = rect.left + "px";
+dropdown.style.width = rect.width + "px";
+
 
     dropdown.style.display =
       dropdown.style.display === "none" ? "block" : "none";
@@ -1557,6 +1603,26 @@ window.showNewOrderNotification = function(count = 1) {
     setTimeout(()=>bar.remove(),600);
   },6000);
 };
+
+// 🧠 دالة عامة لعرض إشعار علوي
+function showNotification(message, color = "#FF6B2D") {
+  const existing = document.querySelector(".notification");
+  if (existing) existing.remove();
+
+  const note = document.createElement("div");
+  note.className = "notification";
+  note.style.background = color;
+  note.textContent = message;
+
+  document.body.appendChild(note);
+
+  setTimeout(() => note.classList.add("show"), 50);
+  setTimeout(() => {
+    note.classList.remove("show");
+    setTimeout(() => note.remove(), 300);
+  }, 3000);
+}
+
 </script>
 
 

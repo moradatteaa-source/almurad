@@ -601,10 +601,12 @@ allProducts = Object.keys(snap.val());
     // 🟠 منتجات إضافية
     let extraProducts = [];
 
-    // دالة إنشاء منتج إضافي
-    function addExtraProduct(product = { name: "", price: 0, qty: 0 }) {
-      const card = document.createElement("div");
-      card.className = "extra-product";
+function addExtraProduct(product = { id: Date.now() + Math.random(), name: "", price: 0, qty: 0 }) {
+  const card = document.createElement("div");
+  card.className = "extra-product";
+  card.dataset.pid = product.id; // ← إضافة المعرف الفريد هنا
+
+
 
       const nameField = document.createElement("div");
       nameField.className = "field single";
@@ -767,14 +769,24 @@ document.getElementById("saveBtn").addEventListener("click", async () => {
   const mainSnap = await get(ref(db, `orders/${orderId}/selectedVariants`));
   const mainVariants = mainSnap.exists() ? mainSnap.val() : {};
 
- // 🧩 بناء الملاحظات وهيكل تفصيلي للمنتجات
+// 🧩 بناء الملاحظات وهيكل تفصيلي للمنتجات (يحفظ المتغيرات لكل منتج بدقة)
 const notesArray = [];
 const productsDetailed = [];
 
 // المنتج الرئيسي
 if (mainProduct.name) {
+  const variantsContainer = document.getElementById("variantsContainer");
+  let variantsObj = {};
+
+  // نقرأ المنسدلات الخاصة بالمنتج الرئيسي
+  variantsContainer.querySelectorAll(".variant-group").forEach(group => {
+    const label = group.querySelector("label")?.textContent.replace(":", "").trim();
+    const input = group.querySelector("input")?.value.trim();
+    if (label && input) variantsObj[label] = input;
+  });
+
+  // نبني النص والوصف
   let varsText = "";
-  const variantsObj = mainVariants || {};
   if (Object.keys(variantsObj).length > 0) {
     const varsArr = Object.entries(variantsObj).map(([k, v]) => `${k}: ${v}`);
     varsText = ` (${varsArr.join("، ")})`;
@@ -788,12 +800,23 @@ if (mainProduct.name) {
   });
 }
 
-// المنتجات الإضافية
 extraProducts.forEach(p => {
+  // نربط العنصر المقابل بناءً على المعرّف وليس الاسم
+  const card = document.querySelector(`.extra-product[data-pid="${p.id}"]`);
+  if (!card) return;
+
+  let varsObj = {};
+  // نقرأ كل متغير خاص بهذا المنتج فقط
+  card.querySelectorAll(".variant-group").forEach(group => {
+    const label = group.querySelector("label")?.textContent.replace(":", "").trim();
+    const input = group.querySelector("input")?.value.trim();
+    if (label && input) varsObj[label] = input;
+  });
+
+
   let varsText = "";
-  const variantsObj = p.selectedVariants || {};
-  if (Object.keys(variantsObj).length > 0) {
-    const varsArr = Object.entries(variantsObj).map(([k, v]) => `${k}: ${v}`);
+  if (Object.keys(varsObj).length > 0) {
+    const varsArr = Object.entries(varsObj).map(([k, v]) => `${k}: ${v}`);
     varsText = ` (${varsArr.join("، ")})`;
   }
 
@@ -801,13 +824,12 @@ extraProducts.forEach(p => {
   productsDetailed.push({
     name: p.name,
     qty: p.qty,
-    variants: variantsObj
+    variants: varsObj
   });
 });
 
 // 🔹 الملاحظات النهائية
 const finalNotes = notesArray.join(" | ");
-
 
 
   // 🔹 حساب الإجماليات
