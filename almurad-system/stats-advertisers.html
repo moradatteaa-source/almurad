@@ -384,13 +384,16 @@ function formatNumber(num) {
 }
 
   function updateCards(v) {
-   document.getElementById("totalSales").textContent = formatNumber(v.totalSales);
-document.getElementById("totalBuy").textContent = formatNumber(v.totalBuy);
-document.getElementById("deliveryCost").textContent = formatNumber(v.deliveryCost);
-document.getElementById("adCostDisplay").textContent = formatNumber(v.adCost);
-document.getElementById("profit").textContent = formatNumber(v.profit);
+  document.getElementById("totalOrders").textContent = formatNumber(v.totalOrders || 0);
+  document.getElementById("deliveredCount").textContent = formatNumber(v.delivered || 0);
+  document.getElementById("returnedCount").textContent = formatNumber(v.returned || 0);
+  document.getElementById("totalSales").textContent = formatNumber(v.totalSales || 0);
+  document.getElementById("totalBuy").textContent = formatNumber(v.totalBuy || 0);
+  document.getElementById("deliveryCost").textContent = formatNumber(v.deliveryCost || 0);
+  document.getElementById("adCostDisplay").textContent = formatNumber(v.adCost || 0);
+  document.getElementById("profit").textContent = formatNumber(v.profit || 0);
+}
 
-  }
 
   // ✅ تصدير ملف Excel بصيغة سليمة (XLSX)
   document.getElementById("exportExcel").onclick = () => {

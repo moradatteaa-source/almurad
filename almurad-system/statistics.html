@@ -181,24 +181,65 @@
     // الحالة الافتراضية للقائمة (نضيف حالاتك مع "تم استلام الراجع")
     const defaultStatuses = ["", "مثبت", "قيد المعالجة", "قيد التجهيز", "بانتظار البضاعة", "قيد التوصيل", "تم التسليم", "راجع", "تم استلام الراجع", "رفض"];
 
-    // تحميل الطلبات من Firebase (مباشر، ونستخدم onValue لكي تتحدّث تلقائياً)
-    const ordersRef = ref(db, 'orders');
+// تحميل الطلبات من Firebase (مباشر، ونستخدم onValue لكي تتحدّث تلقائياً)
+const ordersRef = ref(db, 'orders');
 
-    let allOrders = []; // المصفوفة الكاملة من Firebase
+// 🧩 جلب المستخدم الحالي وصلاحياته
+const loggedUser = JSON.parse(localStorage.getItem("loggedInUser")) || {};
+const roles = loggedUser.roles || [];
+const currentName = loggedUser.name || loggedUser.username || loggedUser.user || "";
+console.log("🧾 بيانات المستخدم كاملة:", loggedUser);
 
-    onValue(ordersRef, (snap) => {
-      if (!snap.exists()) {
-        allOrders = [];
-        renderAll([]);
-        return;
-      }
-      const obj = snap.val();
-      allOrders = Object.entries(obj).map(([id, val]) => ({ id, ...val }));
-      // تحديث dropdown الحالات حسب الموجود أيضاً (دمج مع الافتراضي)
-      populateStatusFilter();
-      // عرض أولي: بدون فلترة (الكل)
-      applyFiltersAndRender();
-    });
+let allOrders = [];
+
+// ✅ نقرأ البيانات ونتابعها مباشرة من Firebase
+onValue(ordersRef, (snap) => {
+  if (!snap.exists()) {
+    allOrders = [];
+    renderAll([]);
+    return;
+  }
+
+  const obj = snap.val();
+  let ordersArray = Object.entries(obj).map(([id, val]) => ({ id, ...val }));
+
+ if (roles.includes("stabilizer") && !roles.includes("admin")) {
+  ordersArray = ordersArray.filter(o => {
+    const fixed = (o.fixedBy || "").trim();
+    return fixed &&
+      (
+        fixed === currentName.trim() ||
+        fixed === (loggedUser.username || "").trim() ||
+        fixed === (loggedUser.name || "").trim() ||
+        fixed.includes(currentName.trim()) || // دعم جزئي (مثلاً "مراد الكافي" يحتوي "مراد")
+        currentName.trim().includes(fixed)
+      );
+  });
+}
+
+  // 🚫 إذا المثبت ما عنده أي طلبات
+if (roles.includes("stabilizer") && ordersArray.length === 0) {
+  document.querySelector(".container").innerHTML = `
+    <div style="
+      text-align:center;
+      margin-top:120px;
+      font-size:20px;
+      color:#043B64;
+      font-weight:bold;
+    ">
+      🚫 ماكو طلبات بعد، ثبّت طلبات وزيد أرباحك 🔥
+    </div>
+  `;
+  return; // نوقف باقي الكود
+}
+
+
+  allOrders = ordersArray;
+  populateStatusFilter();
+  applyFiltersAndRender();
+});
+
+
 
     // ملئ قائمة الحالات
     function populateStatusFilter() {

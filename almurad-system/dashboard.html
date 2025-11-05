@@ -469,24 +469,63 @@ if (storeMenu) storeMenu.style.display = "block";      // إدارة المخز�
 if (settingsMenu) settingsMenu.style.display = "block"; // الإعدادات
 
 // 🟠 الأقسام حسب الصلاحيات
+
+// ✅ الأدمن: يشوف كل شيء
 if (roles.includes("admin")) {
   if (ordersMenu) ordersMenu.style.display = "block";
   if (financeMenu) financeMenu.style.display = "block";
   if (statsMenu) statsMenu.style.display = "block";
   if (usersMenu) usersMenu.style.display = "block";
+  if (storeMenu) storeMenu.style.display = "block";
 }
-if (roles.includes("stabilizer")) {
-  if (ordersMenu) ordersMenu.style.display = "block";
-}
+
+// ✅ المحاسب: الحسابات + الإحصائيات
 if (roles.includes("accountant")) {
   if (financeMenu) financeMenu.style.display = "block";
-}
-if (roles.includes("delivery")) {
   if (statsMenu) statsMenu.style.display = "block";
 }
+
+// ✅ المثبّت: الطلبات + فقط إحصائيات الطلبات
+if (roles.includes("stabilizer") && !roles.includes("admin")) {
+  if (ordersMenu) ordersMenu.style.display = "block";
+
+  // نعرض فقط قسم "إحصائيات الطلبات" داخل قائمة الإحصائيات
+  const statsSubmenu = document.getElementById("statsMenu");
+  if (statsSubmenu) {
+    statsSubmenu.style.display = "block"; // عرض القائمة
+    const items = statsSubmenu.querySelectorAll("div");
+    items.forEach((el) => {
+      // نخلي فقط أول عنصر اللي اسمه "إحصائيات الطلبات" ظاهر
+      if (el.textContent.includes("الطلبات")) el.style.display = "block";
+      else el.style.display = "none";
+    });
+  }
+}
+
+// ✅ موظف المخزن
 if (roles.includes("store")) {
+  if (storeMenu) storeMenu.style.display = "block";
+}
+
+// ✅ المندوب: الطلبات فقط
+if (roles.includes("delivery")) {
   if (ordersMenu) ordersMenu.style.display = "block";
 }
+
+// 🟣 صلاحيات المثبت (stabilizer) – عرض صفحة تفاصيل المنتجات فقط
+if (roles.includes("stabilizer") && !roles.includes("admin")) {
+  // إخفاء كل عناصر المخزن مؤقتًا
+  const storeSubmenu = document.getElementById("storeMenu");
+  if (storeSubmenu) {
+    const items = storeSubmenu.querySelectorAll("div");
+    items.forEach(el => el.style.display = "none");
+
+    // عرض فقط "تفاصيل المنتجات"
+    const detailsItem = Array.from(items).find(el => el.textContent.includes("تفاصيل المنتجات"));
+    if (detailsItem) detailsItem.style.display = "block";
+  }
+}
+
 
     window.toggleMenu = toggleMenu;
     window.toggleSidebar = toggleSidebar;
@@ -633,6 +672,12 @@ async function monthlySmartReset() {
     alert("حدث خطأ أثناء التصفير. تحقق من الاتصال بالإنترنت.");
   }
 }
+// 🔒 إخفاء زر الأرشيف الشهري لغير الأدمن
+const archiveMenu = document.querySelector(".menu-item[onclick*='openArchive']");
+if (archiveMenu && (!roles.includes("admin"))) {
+  archiveMenu.style.display = "none";
+}
+
 // 🗂️ فتح صفحة الأرشيف الشهري
 function openArchive() {
   window.location.href = "monthly-archive.html";

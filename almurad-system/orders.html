@@ -2,18 +2,9 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>الطلبات - نظام المراد</title>
   <style>
-    /* ✅ جعل الصف الأول ثابت عند التمرير للأسفل */
-thead th {
-  position: sticky;
-  top: 0;
-  background: #043B64; /* نفس لون الهيدر */
-  color: white;
-  z-index: 10;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-}
 
     body {
       font-family: Tahoma, Arial;
@@ -63,12 +54,24 @@ thead th {
       border-radius: 6px;
       border: 1px solid #ccc;
     }
-    .table-container {
-      width: 100%;
-      overflow-x: auto;
-      white-space: nowrap;
-      padding: 10px;
-    }
+   .table-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: auto; /* ✅ يسمح بالتمرير العمودي */
+  white-space: nowrap;
+  padding: 10px;
+  max-height: 80vh; /* ✅ يخلي الجدول ضمن ارتفاع الشاشة */
+}
+thead th {
+  position: sticky;
+  top: 0;
+  background: #043B64;
+  color: white;
+  z-index: 10;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+
     table {
       width: max-content;
       min-width: 1400px;
@@ -165,6 +168,12 @@ input, select, textarea {
 .notification.show {
   opacity: 1;
   transform: translateY(0);
+}
+@media (max-width: 768px) {
+  input, select, textarea, button {
+    font-size: 16px !important;
+    touch-action: manipulation;
+  }
 }
 
   </style>
@@ -609,13 +618,28 @@ function refreshVisibleOrders() {
 }
 
 
-    // أدوات الإدخال والمنسدلات
-    function createEditableInput(value, onSave) {
-      const input = document.createElement("input");
-      input.value = value || "";
-      input.addEventListener("change", e => onSave(e.target.value));
-      return input;
+  function createEditableInput(value, onSave) {
+  const input = document.createElement("input");
+  input.value = value || "";
+const numberFormatter = new Intl.NumberFormat("en-US");
+
+  // 🔹 تنسيق الأرقام أثناء الكتابة بفاصلة الألف تلقائياً
+  input.addEventListener("input", e => {
+    let val = e.target.value.replace(/[^\d]/g, ""); // نزيل أي رموز غير أرقام
+    if (val) {
+      e.target.value = new Intl.NumberFormat("en-US").format(val);
     }
+  });
+
+  // 🔹 عند الحفظ نحول الرقم إلى صيغة بدون فواصل للحفظ داخل النظام
+  input.addEventListener("change", e => {
+    const cleanValue = e.target.value.replace(/,/g, "");
+    onSave(cleanValue);
+  });
+
+  return input;
+}
+
 
     function createTextarea(value, onSave) {
       const t = document.createElement("textarea");
@@ -860,6 +884,48 @@ function createTagsDropdownCell(orderId, initialValue = "", options = [], onSave
 
       orders.forEach((order, index) => {
         const tr = document.createElement("tr");
+           // 🛑 منع التعديل على حالات معينة للموظفين العاديين
+  const user = JSON.parse(localStorage.getItem("loggedInUser")) || {};
+  const roles = user.roles || [];
+  const readOnlyStatuses = ["تم التسليم", "راجع", "تم استلام الراجع"];
+  const isReadOnly = readOnlyStatuses.includes(order.status?.trim());
+
+  // 🔒 إذا المستخدم ليس أدمن ولا محاسب، والحالة من الحالات المقفلة
+  if (!roles.includes("admin") && !roles.includes("accountant") && isReadOnly) {
+    // نحول جميع الحقول إلى نصوص ثابتة فقط (بدون إدخال)
+    const cols = [
+      order.code, order.phone1 || order.phone, order.phone2, order.city, order.area,
+      order.address, order.price, order.quantity, order.productName, order.notes,
+      order.receiptNum, order.status, order.orderDate, order.advertiser
+    ];
+
+    // 🔢 رقم تسلسلي
+    const indexTd = document.createElement("td");
+    indexTd.textContent = index + 1;
+
+    // 🔍 تفاصيل
+    const detailsTd = document.createElement("td");
+    const btn = document.createElement("button");
+    btn.textContent = "🔍 تفاصيل";
+    btn.style.background = "#FF6B2D";
+    btn.onclick = () => openOrderDetailsInline(order);
+    detailsTd.appendChild(btn);
+
+    // ✅ نضيف الأعمدة
+    tr.appendChild(document.createElement("td")); // checkbox فارغ
+    tr.appendChild(indexTd);
+    tr.appendChild(detailsTd);
+
+    cols.forEach((val) => {
+      const td = document.createElement("td");
+      td.textContent = val || "-";
+      tr.appendChild(td);
+    });
+
+    ordersBody.appendChild(tr);
+    return; // ⛔ نوقف هنا، ما نكمل باقي الكود الخاص بالتحرير
+  }
+
         const areas = citiesData[order.city] || [];
 
         // ✅ اختيار

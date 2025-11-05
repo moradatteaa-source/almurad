@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>➕ إضافة طلب جديد - نظام المراد</title>
   <style>
     :root {
@@ -182,6 +182,32 @@
     }
 
     input, select, textarea { font-size: 16px !important; }
+    /* ✅ منع التقريب التلقائي وتغطية الشاشة بالكامل */
+@media (max-width: 768px) {
+  html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    touch-action: manipulation;
+  }
+
+  input, select, textarea, button {
+    font-size: 16px !important;
+  }
+}
+
+/* ✅ جعل الصفحة تغطي كامل الشاشة في كل الأجهزة */
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background: var(--background-gray);
+}
+
   </style>
 </head>
 
