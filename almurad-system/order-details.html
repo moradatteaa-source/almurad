@@ -311,15 +311,16 @@ body, html {
   margin: auto;
 }
 
-/* ✅ جعل الأزرار السفلية تبقى في مكان واضح */
 .bottom-actions {
   position: fixed;
-  bottom: 10px;
-  right: 10px;
+  bottom: 70px; /* 🔼 كان 10 صار 70 حتى يصعد للأعلى */
+  right: 15px;
   display: flex;
   flex-direction: row;
-  gap: 12px;
+  gap: 14px;
+  z-index: 9999; /* 🔹 تأكد يبقى فوق كل العناصر */
 }
+
 
 .contact-btn {
   width: 55px;
@@ -332,11 +333,10 @@ body, html {
 input, textarea {
   font-size: 15px;
 }
-/* ✅ تحسين شكل أزرار الحفظ والرجوع */
-#saveBtn, #backBtn {
-  margin-bottom: 10px;
-  border-radius: 10px;
-  font-size: 16px;
+@media (max-width: 768px) {
+  .bottom-actions {
+    bottom: 80px; /* مخصص للموبايل */
+  }
 }
 
   </style>
@@ -459,7 +459,7 @@ input, textarea {
 
   <div class="bottom-actions">
     <a id="callBtn" class="contact-btn" title="اتصال">📞</a>
-<a id="whatsappBtn" class="contact-btn whatsapp" title="واتساب" href="#">💬</a>
+    <a id="whatsappBtn" class="contact-btn whatsapp" title="واتساب">💬</a>
   </div>
     <!-- سكربت الفايربيس -->
   <script type="module">
@@ -1085,18 +1085,22 @@ function createTagChip(name, onRemove) {
 
   return chip;
 }
-// 🔙 زر الرجوع إلى لوحة الطلبات
-document.getElementById("backBtn").addEventListener("click", () => {
+// 🔙 زر الرجوع بنفس طريقة الحفظ (نفس الحالة والمكان)
+document.getElementById("backBtn").addEventListener("click", async () => {
   const lastStatus = localStorage.getItem("lastStatusView");
   const lastScroll = localStorage.getItem("previousScrollPosition");
 
   if (lastStatus) {
+    // نخزن موقع التمرير حتى نرجع له
     localStorage.setItem("restoreScrollAfterReturn", lastScroll || "0");
+    // نرجع لنفس الحالة المفتوحة سابقًا
     window.location.href = `orders.html?status=${encodeURIComponent(lastStatus)}`;
   } else {
+    // إذا ماكو حالة، نرجع للكل
     window.location.href = "orders.html";
   }
 });
+
 
 // ✅ تحديث شامل للمخزون عند تغيير حالة الطلب (يدعم كل الحالات)
 window.adjustStockOnStatusChange = async function(orderId, newStatus) {
@@ -1240,16 +1244,14 @@ window.adjustStockOnStatusChange = async function(orderId, newStatus) {
     console.log(`✅ تم تحديث ${name} (${variantKey}) بنجاح`);
   }
 };
-window.addEventListener("load", () => {
-  setTimeout(() => {
-    const savedScroll = localStorage.getItem("restoreScrollAfterReturn");
-    if (savedScroll) {
-      window.scrollTo(0, parseInt(savedScroll));
-      localStorage.removeItem("restoreScrollAfterReturn");
-    }
-  }, 700); // تأخير بسيط بعد تحميل الصفحة
+// 🧭 استرجاع موضع التمرير بعد العودة من التفاصيل
+document.addEventListener("DOMContentLoaded", () => {
+  const savedScroll = localStorage.getItem("restoreScrollAfterReturn");
+  if (savedScroll) {
+    window.scrollTo(0, parseInt(savedScroll));
+    localStorage.removeItem("restoreScrollAfterReturn");
+  }
 });
-
 
   </script>
 </body>

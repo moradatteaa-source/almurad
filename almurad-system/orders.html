@@ -238,6 +238,14 @@ input, select, textarea {
     </table>
   </div>
 <script type="module">
+  // 🧠 حفظ آخر حالة يفتحها المستخدم + موقع التمرير
+window.addEventListener("beforeunload", () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const currentStatus = decodeURIComponent(urlParams.get("status") || "");
+  localStorage.setItem("lastStatusView", currentStatus);
+  localStorage.setItem("previousScrollPosition", window.scrollY);
+});
+
   import { waseetCities } from "./waseetCities.js";
   import { waseetRegions } from "./waseetRegions.js";
   import { citiesData, allCities } from "./citiesData.js";
@@ -618,27 +626,30 @@ function refreshVisibleOrders() {
 }
 
 
-  function createEditableInput(value, onSave) {
+function createEditableInput(value, onSave, fieldName = "") {
   const input = document.createElement("input");
   input.value = value || "";
-const numberFormatter = new Intl.NumberFormat("en-US");
 
-  // 🔹 تنسيق الأرقام أثناء الكتابة بفاصلة الألف تلقائياً
-  input.addEventListener("input", e => {
-    let val = e.target.value.replace(/[^\d]/g, ""); // نزيل أي رموز غير أرقام
-    if (val) {
-      e.target.value = new Intl.NumberFormat("en-US").format(val);
-    }
-  });
-
-  // 🔹 عند الحفظ نحول الرقم إلى صيغة بدون فواصل للحفظ داخل النظام
-  input.addEventListener("change", e => {
-    const cleanValue = e.target.value.replace(/,/g, "");
-    onSave(cleanValue);
-  });
+  // 🧠 نخلي الفاصلة فقط لو الحقل اسمه السعر أو العدد
+  if (fieldName === "price" || fieldName === "quantity") {
+    input.addEventListener("input", e => {
+      let val = e.target.value.replace(/[^\d]/g, "");
+      if (val) {
+        e.target.value = new Intl.NumberFormat("en-US").format(val);
+      }
+    });
+    input.addEventListener("change", e => {
+      const cleanValue = e.target.value.replace(/,/g, "");
+      onSave(cleanValue);
+    });
+  } else {
+    // 🟠 باقي الحقول بدون أي فاصلة
+    input.addEventListener("change", e => onSave(e.target.value));
+  }
 
   return input;
 }
+
 
 
     function createTextarea(value, onSave) {
@@ -1126,7 +1137,8 @@ else {
     } else if (f.area) {
       const areaDropdown = createDropdown(areas, order.area || "", val => update(ref(db, `orders/${order.id}`), { area: val }));
       td.appendChild(areaDropdown);
-    } else td.appendChild(createEditableInput(f.val, f.fn));
+    } else td.appendChild(createEditableInput(f.val, f.fn, f.name || ""));
+
   }
 
   tr.appendChild(td);
@@ -1419,6 +1431,10 @@ document.getElementById("updateStatuses").addEventListener("click", async () => 
           status: mappedStatus
         });
         updatedCount++;
+  // ✅ خصم الكمية تلقائياً إذا تحولت الحالة إلى "قيد التوصيل"
+  if (mappedStatus === "قيد التوصيل" || mappedStatus === "تم استلام الراجع") {
+    await adjustStockOnStatusChange(targetOrder.id, mappedStatus);
+  }
 
         if (apiStatus === "في موقع فرز بغداد") {
           await update(ref(db, `orders/${targetOrder.id}`), {
@@ -1504,7 +1520,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-  </script>
+// 🧩 عند تحميل الصفحة، إذا موجود موضع سابق نرجع له
+document.addEventListener("DOMContentLoaded", () => {
+  const restoreScroll = localStorage.getItem("restoreScrollAfterReturn");
+  if (restoreScroll) {
+    window.scrollTo(0, parseInt(restoreScroll));
+    localStorage.removeItem("restoreScrollAfterReturn");
+  }
+});
+</script>
+
   <!-- ✅ نافذة تفاصيل الطلب الكاملة (منسوخة من صفحة التفاصيل) -->
   <div id="detailsModal" style="display:none;">
     <iframe id="detailsFrame" style="
