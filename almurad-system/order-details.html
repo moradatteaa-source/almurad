@@ -299,6 +299,45 @@ body, html {
   margin: 0;
   padding: 10px;
 }
+/* ✅ ضبط عرض العناصر في الموبايل */
+.card, .row, .field {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.container {
+  max-width: 600px;
+  width: 95%;
+  margin: auto;
+}
+
+/* ✅ جعل الأزرار السفلية تبقى في مكان واضح */
+.bottom-actions {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+}
+
+.contact-btn {
+  width: 55px;
+  height: 55px;
+  line-height: 55px;
+  font-size: 24px;
+}
+
+/* ✅ تصغير الحقول قليلاً للملاءمة */
+input, textarea {
+  font-size: 15px;
+}
+/* ✅ تحسين شكل أزرار الحفظ والرجوع */
+#saveBtn, #backBtn {
+  margin-bottom: 10px;
+  border-radius: 10px;
+  font-size: 16px;
+}
 
   </style>
 </head>
@@ -420,7 +459,7 @@ body, html {
 
   <div class="bottom-actions">
     <a id="callBtn" class="contact-btn" title="اتصال">📞</a>
-    <a id="whatsappBtn" class="contact-btn whatsapp" title="واتساب">💬</a>
+<a id="whatsappBtn" class="contact-btn whatsapp" title="واتساب" href="#">💬</a>
   </div>
     <!-- سكربت الفايربيس -->
   <script type="module">
@@ -791,8 +830,10 @@ if (phone) {
   let normalizedPhone = phone.replace(/[^\d]/g, '').replace(/^0+/, '');
   if (!normalizedPhone.startsWith('964')) normalizedPhone = '964' + normalizedPhone;
   
-  waBtn.href = `https://wa.me/${normalizedPhone}`;
-  waBtn.target = "_blank";
+  waBtn.setAttribute("href", `https://wa.me/${normalizedPhone}`);
+waBtn.setAttribute("target", "_blank");
+waBtn.setAttribute("rel", "noopener noreferrer");
+
 }
 
 
@@ -1199,14 +1240,16 @@ window.adjustStockOnStatusChange = async function(orderId, newStatus) {
     console.log(`✅ تم تحديث ${name} (${variantKey}) بنجاح`);
   }
 };
-// 🧭 استرجاع موضع التمرير بعد العودة من التفاصيل
-document.addEventListener("DOMContentLoaded", () => {
-  const savedScroll = localStorage.getItem("restoreScrollAfterReturn");
-  if (savedScroll) {
-    window.scrollTo(0, parseInt(savedScroll));
-    localStorage.removeItem("restoreScrollAfterReturn");
-  }
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    const savedScroll = localStorage.getItem("restoreScrollAfterReturn");
+    if (savedScroll) {
+      window.scrollTo(0, parseInt(savedScroll));
+      localStorage.removeItem("restoreScrollAfterReturn");
+    }
+  }, 700); // تأخير بسيط بعد تحميل الصفحة
 });
+
 
   </script>
 </body>
