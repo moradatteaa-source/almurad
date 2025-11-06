@@ -647,7 +647,7 @@ const numberFormatter = new Intl.NumberFormat("en-US");
       t.addEventListener("change", e => onSave(e.target.value));
       return t;
     }
-// ✅ دالة منسدلة احترافية – تظهر فوق الجدول وتُغلق أي منسدلة أخرى مفتوحة
+// ✅ دالة منسدلة قابلة للكتابة + اختيار من القائمة
 function createDropdown(options, selected, onChange) {
   const wrapper = document.createElement("div");
   wrapper.style.position = "relative";
@@ -655,19 +655,19 @@ function createDropdown(options, selected, onChange) {
   const input = document.createElement("input");
   input.type = "text";
   input.value = selected || "";
-  input.placeholder = "اختر...";
-  input.readOnly = true;
-  input.style.cursor = "pointer";
+  input.placeholder = "اكتب أو اختر...";
+  input.style.cursor = "text";
   input.style.width = "100%";
   input.style.borderRadius = "4px";
   input.style.padding = "4px";
   input.style.border = "1px solid #ccc";
   input.style.background = "#fff";
+  input.style.fontSize = "12px";
 
   // ⚙️ المنسدلة
   const dropdown = document.createElement("div");
   Object.assign(dropdown.style, {
-    position: "fixed", // ⬅️ فوق الجدول دومًا
+    position: "fixed",
     background: "#fff",
     border: "1px solid #ccc",
     borderRadius: "6px",
@@ -680,70 +680,59 @@ function createDropdown(options, selected, onChange) {
   });
   document.body.appendChild(dropdown);
 
-  // 🔹 إنشاء الخيارات
-  dropdown.innerHTML = options.map(o => `
-    <div class="opt" style="padding:7px 10px;cursor:pointer;">
-      ${o}
-    </div>
-  `).join("");
-
-  dropdown.querySelectorAll(".opt").forEach(opt => {
-    opt.addEventListener("click", () => {
-      input.value = opt.textContent.trim();
-      dropdown.style.display = "none";
-      if (typeof onChange === "function") onChange(opt.textContent.trim());
-    });
-    opt.addEventListener("mouseenter", () => opt.style.background = "#f1f1f1");
-    opt.addEventListener("mouseleave", () => opt.style.background = "");
-  });
-
-  // 🧠 متغير عالمي لمتابعة آخر منسدلة مفتوحة
-  window.currentOpenDropdown = window.currentOpenDropdown || null;
-
-  // 🔻 فتح المنسدلة
-  input.addEventListener("click", (e) => {
-    e.stopPropagation();
-
-    // إغلاق أي منسدلة مفتوحة مسبقًا
-    if (window.currentOpenDropdown && window.currentOpenDropdown !== dropdown) {
-      window.currentOpenDropdown.style.display = "none";
+  // 🔹 عرض القائمة
+  function showDropdown(filter = "") {
+    dropdown.innerHTML = "";
+    const filtered = options.filter(o => o.includes(filter));
+    if (filtered.length === 0) {
+      const noRes = document.createElement("div");
+      noRes.textContent = "لا توجد نتائج";
+      noRes.style.padding = "6px 10px";
+      dropdown.appendChild(noRes);
+    } else {
+      filtered.forEach(o => {
+        const opt = document.createElement("div");
+        opt.textContent = o;
+        opt.style.padding = "5px 8px";
+        opt.style.cursor = "pointer";
+        opt.addEventListener("click", () => {
+          input.value = opt.textContent.trim();
+          dropdown.style.display = "none";
+          if (onChange) onChange(opt.textContent.trim());
+        });
+        dropdown.appendChild(opt);
+      });
     }
 
- const rect = input.getBoundingClientRect();
-const viewportHeight = window.innerHeight;
-const spaceBelow = viewportHeight - rect.bottom;
-const dropdownHeight = 200; // نفس maxHeight بالـ CSS
+    const rect = input.getBoundingClientRect();
+    dropdown.style.top = rect.bottom + "px";
+    dropdown.style.left = rect.left + "px";
+    dropdown.style.width = rect.width + "px";
+    dropdown.style.display = "block";
+  }
 
-// إذا ماكو مساحة كافية أسفل، خليه يطلع فوق
-if (spaceBelow < dropdownHeight) {
-  dropdown.style.top = (rect.top - dropdownHeight) + "px";
-} else {
-  dropdown.style.top = rect.bottom + "px";
-}
+  // 🧠 عرض عند الكتابة
+  input.addEventListener("focus", () => showDropdown(input.value.trim()));
+  input.addEventListener("input", (e) => showDropdown(e.target.value.trim()));
 
-dropdown.style.left = rect.left + "px";
-dropdown.style.width = rect.width + "px";
-
-
-    dropdown.style.display =
-      dropdown.style.display === "none" ? "block" : "none";
-
-    // حفظ المنسدلة الحالية كمفتوحة
-    window.currentOpenDropdown =
-      dropdown.style.display === "block" ? dropdown : null;
+  // ✅ السماح بكتابة حالة جديدة بالإنتر
+  input.addEventListener("keydown", (ev) => {
+    if (ev.key === "Enter" && input.value.trim()) {
+      ev.preventDefault();
+      dropdown.style.display = "none";
+      if (onChange) onChange(input.value.trim());
+    }
   });
 
-  // ⛔ إغلاق عند النقر خارجها فقط
+  // إغلاق عند النقر خارجها
   document.addEventListener("click", (e) => {
-    if (!dropdown.contains(e.target) && !wrapper.contains(e.target)) {
-      dropdown.style.display = "none";
-      window.currentOpenDropdown = null;
-    }
+    if (!wrapper.contains(e.target)) dropdown.style.display = "none";
   });
 
   wrapper.appendChild(input);
   return wrapper;
 }
+
 
 
 // ✅ دالة لعرض خانة "اسم المنتج" مع بحث وتحويلها إلى فقاعات
@@ -862,7 +851,23 @@ function createTagsDropdownCell(orderId, initialValue = "", options = [], onSave
   }
 
   input.addEventListener("focus", () => showDropdown());
-  input.addEventListener("input", e => showDropdown(e.target.value.trim()));
+input.addEventListener("input", e => {
+  const value = e.target.value.trim();
+  showDropdown(value);
+
+  // ✅ السماح بإضافة نص جديد بالإنتر
+  input.onkeydown = (ev) => {
+    if (ev.key === "Enter" && value) {
+      ev.preventDefault();
+      if (!tags.includes(value)) {
+        tags.push(value);
+        saveTags();
+      }
+      input.value = "";
+      dropdown.style.display = "none";
+    }
+  };
+});
   document.addEventListener("click", e => {
     if (!container.contains(e.target)) dropdown.style.display = "none";
   });
