@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>تفاصيل الطلب - نظام المراد</title>
+  
   <style>
     .add-small-btn {
   background: rgba(4, 59, 100, 0.08);
@@ -281,6 +282,22 @@ html, body {
 .extra-product:hover {
   background: #fff7f3;
   transform: scale(1.01);
+}
+/* ✅ إصلاح امتلاء الشاشة بدون فراغات */
+body, html {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background: var(--background-gray);
+}
+
+.container {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 10px;
 }
 
   </style>
@@ -763,12 +780,21 @@ function addExtraProduct(product = { id: Date.now() + Math.random(), name: "", p
       document.getElementById("price").value = data.price || "";
       document.getElementById("quantity").value = data.quantity || "";
 
-      // إعداد واتساب واتصال
-      const phone = data.phone1 || "";
-      document.getElementById("callBtn").href = `tel:${phone}`;
-      let normalizedPhone = phone.toString().trim().replace(/[^\d]/g, '').replace(/^0+/, '');
-      if (!normalizedPhone.startsWith('964')) normalizedPhone = '964' + normalizedPhone;
-      document.getElementById("whatsappBtn").onclick = () => window.open(`https://wa.me/${normalizedPhone}`, "_blank");
+// إعداد واتساب واتصال
+const phone = (data.phone1 || "").trim();
+if (phone) {
+  const callBtn = document.getElementById("callBtn");
+  const waBtn = document.getElementById("whatsappBtn");
+  
+  callBtn.href = `tel:${phone}`;
+
+  let normalizedPhone = phone.replace(/[^\d]/g, '').replace(/^0+/, '');
+  if (!normalizedPhone.startsWith('964')) normalizedPhone = '964' + normalizedPhone;
+  
+  waBtn.href = `https://wa.me/${normalizedPhone}`;
+  waBtn.target = "_blank";
+}
+
 
       // المدينة والمنطقة
       const cityDiv = document.getElementById("city");
@@ -1020,21 +1046,17 @@ function createTagChip(name, onRemove) {
 }
 // 🔙 زر الرجوع إلى لوحة الطلبات
 document.getElementById("backBtn").addEventListener("click", () => {
-const lastStatus = localStorage.getItem("lastStatusView");
-if (lastStatus) {
-  window.location.href = `orders.html?status=${encodeURIComponent(lastStatus)}`;
-} else {
-// 🔙 بعد الحفظ، نرجع المستخدم لنفس الحالة السابقة
-const params = new URLSearchParams(window.location.search);
-const lastStatus = params.get("status") || localStorage.getItem("lastStatusView");
+  const lastStatus = localStorage.getItem("lastStatusView");
+  const lastScroll = localStorage.getItem("previousScrollPosition");
 
-if (lastStatus) {
-  window.location.href = `orders.html?status=${encodeURIComponent(lastStatus)}`;
-} else {
-  window.location.href = "orders.html";
-}
-}
+  if (lastStatus) {
+    localStorage.setItem("restoreScrollAfterReturn", lastScroll || "0");
+    window.location.href = `orders.html?status=${encodeURIComponent(lastStatus)}`;
+  } else {
+    window.location.href = "orders.html";
+  }
 });
+
 // ✅ تحديث شامل للمخزون عند تغيير حالة الطلب (يدعم كل الحالات)
 window.adjustStockOnStatusChange = async function(orderId, newStatus) {
   const db = getDatabase();
