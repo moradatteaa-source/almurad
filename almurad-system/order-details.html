@@ -997,19 +997,19 @@ if (["قيد التوصيل", "تم استلام الراجع"].includes(newStat
   await adjustStockOnStatusChange(orderId, newStatus);
 }
 
-// ✅ بعد الحفظ، نرجع المستخدم لنفس الحالة والمكان القديم تماماً
+// ✅ بعد الحفظ، نغلق نافذة التفاصيل بدون إعادة تحميل الصفحة
 const lastStatus = localStorage.getItem("lastStatusView");
 const lastScroll = localStorage.getItem("previousScrollPosition");
 
-if (lastStatus) {
-  // نرسل الحالة بالرابط حتى يعرض نفس الصفحة القديمة
-  localStorage.setItem("restoreScrollAfterReturn", lastScroll || "0");
-  window.location.href = `orders.html?status=${encodeURIComponent(lastStatus)}`;
-} else {
-  window.location.href = "orders.html";
-}
+// نحفظ موقع التمرير فقط
+localStorage.setItem("restoreScrollAfterReturn", lastScroll || "0");
 
-}); // ← أضف هذا القوس هنا لإغلاق event listener
+// نرسل رسالة للصفحة الرئيسية حتى تغلق نافذة التفاصيل
+if (window.parent) {
+  window.parent.postMessage("closeDetailsModal", "*");
+}
+}); // ← إغلاق event listener
+
 
 
 
@@ -1085,21 +1085,16 @@ function createTagChip(name, onRemove) {
 
   return chip;
 }
-// 🔙 زر الرجوع بنفس طريقة الحفظ (نفس الحالة والمكان)
-document.getElementById("backBtn").addEventListener("click", async () => {
-  const lastStatus = localStorage.getItem("lastStatusView");
+// 🔙 زر الرجوع يغلق نافذة التفاصيل فقط بدون إعادة تحميل الصفحة
+document.getElementById("backBtn").addEventListener("click", () => {
   const lastScroll = localStorage.getItem("previousScrollPosition");
+  localStorage.setItem("restoreScrollAfterReturn", lastScroll || "0");
 
-  if (lastStatus) {
-    // نخزن موقع التمرير حتى نرجع له
-    localStorage.setItem("restoreScrollAfterReturn", lastScroll || "0");
-    // نرجع لنفس الحالة المفتوحة سابقًا
-    window.location.href = `orders.html?status=${encodeURIComponent(lastStatus)}`;
-  } else {
-    // إذا ماكو حالة، نرجع للكل
-    window.location.href = "orders.html";
+  if (window.parent) {
+    window.parent.postMessage("closeDetailsModal", "*");
   }
 });
+
 
 
 // ✅ تحديث شامل للمخزون عند تغيير حالة الطلب (يدعم كل الحالات)

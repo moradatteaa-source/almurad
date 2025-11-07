@@ -687,11 +687,6 @@ window.openArchive = openArchive;
   </script>
 <!-- ✅ نظام إشعار الطلب الجديد (نفس كود صفحة الطلبات) -->
 <script>
-// ✅ تعطيل تشغيل الصوت عند أول تفاعل (صامت)
-document.addEventListener("click", () => {
-  window.soundAllowed = true; // مجرد تفعيل بدون أي صوت
-});
-
 
   // ✅ دالة عرض الإشعار والصوت (نفس الموجود بصفحة الطلبات)
   function showNewOrderNotification(count = 1) {
@@ -780,7 +775,22 @@ const audio = new Audio("cash-register-kaching.mp3");
       previousCount = count;
     });
   });
-</script>
 
+  <!-- ✅ تفعيل الصوت الصامت عند أول لمسة فقط (بدون أي صوت مسموع) -->
+  document.addEventListener("touchstart", function enableSoundOnce() {
+    try {
+      // تشغيل ملف الصوت بشكل صامت لتفعيل صلاحية الصوت في الموبايل
+      const silentAudio = new Audio("cash-register-kaching.mp3");
+      silentAudio.volume = 0; // 🔇 لا يصدر صوت
+      silentAudio.play().catch(()=>{});
+    } catch (e) {
+      console.warn("⚠️ لم يتم تفعيل الصوت بعد:", e);
+    }
+    window.soundAllowed = true; // ✅ فقط تفعيل الإذن
+    console.log("🔊 تم تفعيل إذن الصوت بنجاح (صامت)");
+    document.removeEventListener("touchstart", enableSoundOnce);
+  }, { once: true });
+
+</script>
 </body>
 </html>

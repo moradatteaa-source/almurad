@@ -1713,6 +1713,23 @@ function showNotification(message, color = "#FF6B2D") {
     setTimeout(() => note.remove(), 300);
   }, 3000);
 }
+// ✅ بعد الحفظ، نرجع المستخدم لنفس الحالة والمكان القديم تماماً
+const lastStatus = localStorage.getItem("lastStatusView");
+const lastScroll = localStorage.getItem("previousScrollPosition");
+
+// 🔹 بعد الحفظ، نغلق النافذة المنبثقة بدون إعادة تحميل صفحة الطلبات
+if (window.parent) {
+  localStorage.setItem("restoreScrollAfterReturn", lastScroll || "0");
+  window.parent.postMessage("closeDetailsModal", "*");
+}
+
+// ✅ زر الرجوع يشتغل دائماً بنفس الطريقة
+document.getElementById("backBtn").addEventListener("click", () => {
+  if (window.parent) {
+    window.parent.postMessage("closeDetailsModal", "*");
+  }
+});
+
 
 </script>
 
