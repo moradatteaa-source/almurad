@@ -776,20 +776,23 @@ const audio = new Audio("cash-register-kaching.mp3");
     });
   });
 
-  <!-- ✅ تفعيل الصوت الصامت عند أول لمسة فقط (بدون أي صوت مسموع) -->
-  document.addEventListener("touchstart", function enableSoundOnce() {
-    try {
-      // تشغيل ملف الصوت بشكل صامت لتفعيل صلاحية الصوت في الموبايل
-      const silentAudio = new Audio("cash-register-kaching.mp3");
-      silentAudio.volume = 0; // 🔇 لا يصدر صوت
-      silentAudio.play().catch(()=>{});
-    } catch (e) {
-      console.warn("⚠️ لم يتم تفعيل الصوت بعد:", e);
-    }
-    window.soundAllowed = true; // ✅ فقط تفعيل الإذن
-    console.log("🔊 تم تفعيل إذن الصوت بنجاح (صامت)");
-    document.removeEventListener("touchstart", enableSoundOnce);
-  }, { once: true });
+<!-- ✅ تفعيل إذن الصوت بدون تشغيل أي ملف -->
+document.addEventListener("touchstart", function enableSoundOnce() {
+  try {
+    // إنشاء كائن صوت بدون تحميل ملف
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = ctx.createBufferSource();
+    source.connect(ctx.destination);
+    // فقط لتفعيل إذن الصوت – لا تشغيل فعلي
+  } catch (e) {
+    console.warn("⚠️ لم يتم تفعيل الصوت بعد:", e);
+  }
+  window.soundAllowed = true; // ✅ تم تفعيل الإذن
+  console.log("🔇 تم تفعيل إذن الصوت بدون أي صوت فعلي");
+  document.removeEventListener("touchstart", enableSoundOnce);
+}, { once: true });
+
+document.addEventListener("click", enableSoundOnce, { once: true });
 
 </script>
 </body>

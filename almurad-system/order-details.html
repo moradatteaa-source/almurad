@@ -1249,5 +1249,23 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
   </script>
+  <!-- ✅ تفعيل إذن الصوت بدون أي صوت فعلي (صامت تمامًا) -->
+<script>
+document.addEventListener("touchstart", function enableSoundOnce() {
+  try {
+    // إنشاء AudioContext فقط لتفعيل صلاحية الصوت بدون تشغيل أي ملف
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = ctx.createBufferSource();
+    source.connect(ctx.destination);
+    // ما نحتاج نشغل أي شيء فعلي — مجرد فتح الإذن
+  } catch (e) {
+    console.warn("⚠️ لم يتم تفعيل الصوت بعد:", e);
+  }
+  window.soundAllowed = true; // ✅ تفعيل الإذن
+  console.log("🔇 تم تفعيل إذن الصوت بدون أي صوت فعلي");
+  document.removeEventListener("touchstart", enableSoundOnce);
+}, { once: true });
+</script>
+
 </body>
 </html> 
