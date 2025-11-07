@@ -716,10 +716,26 @@ function createDropdown(options, selected, onChange) {
     }
 
     const rect = input.getBoundingClientRect();
-    dropdown.style.top = rect.bottom + "px";
-    dropdown.style.left = rect.left + "px";
-    dropdown.style.width = rect.width + "px";
-    dropdown.style.display = "block";
+const scrollY = window.scrollY || document.documentElement.scrollTop;
+const scrollX = window.scrollX || document.documentElement.scrollLeft;
+const dropdownHeight = 200;
+const spaceBelow = window.innerHeight - rect.bottom;
+
+// ✅ إذا المكان تحت ضيق، تفتح للأعلى بنفس ترتيب الحقل
+let topPosition;
+if (spaceBelow < dropdownHeight) {
+  topPosition = rect.top + scrollY - dropdownHeight - 5; // تفتح فوق بشكل مرتب
+} else {
+  topPosition = rect.bottom + scrollY + 3; // تفتح تحت بشكل طبيعي
+}
+
+dropdown.style.position = "absolute";
+dropdown.style.top = `${topPosition}px`;
+dropdown.style.left = `${rect.left + scrollX}px`;
+dropdown.style.width = `${rect.width}px`;
+dropdown.style.display = "block";
+dropdown.style.zIndex = "9999999";
+
   }
 
   // 🧠 عرض عند الكتابة
@@ -855,10 +871,27 @@ function createTagsDropdownCell(orderId, initialValue = "", options = [], onSave
     }
 
     const rect = input.getBoundingClientRect();
-    dropdown.style.top = rect.bottom + "px";
-    dropdown.style.left = rect.left + "px";
-    dropdown.style.width = rect.width + "px";
-    dropdown.style.display = "block";
+const scrollY = window.scrollY || document.documentElement.scrollTop;
+const scrollX = window.scrollX || document.documentElement.scrollLeft;
+const dropdownHeight = 200;
+const spaceBelow = window.innerHeight - rect.bottom;
+
+// ✅ إذا ماكو مكان كافي تحت الحقل، خلي المنسدلة تطلع للأعلى
+let topPosition;
+if (spaceBelow < dropdownHeight) {
+  topPosition = rect.top + scrollY - dropdownHeight - 5; // للأعلى
+} else {
+  topPosition = rect.bottom + scrollY + 3; // للأسفل
+}
+
+// ✅ تحديد الموقع الحقيقي بدون fixed حتى تتبع التمرير
+dropdown.style.position = "absolute";
+dropdown.style.top = `${topPosition}px`;
+dropdown.style.left = `${rect.left + scrollX}px`;
+dropdown.style.width = `${rect.width}px`;
+dropdown.style.display = "block";
+dropdown.style.zIndex = "9999999";
+
   }
 
   input.addEventListener("focus", () => showDropdown());
@@ -972,18 +1005,21 @@ localStorage.setItem("selectedOrder", order.id);
 localStorage.setItem("lastStatusView", currentStatus);
 
 // ✅ نرسلها أيضًا كـ query في الرابط حتى صفحة التفاصيل تعرفها
-frame.src = `order-details.html?status=${encodeURIComponent(currentStatus)}`;
+frame.src = `order-details.html?id=${order.id}&status=${encodeURIComponent(currentStatus)}`;
 
   modal.style.display = "block";
 
 
-  // السماح بإغلاقها بزر رجوع
-  window.addEventListener("message", (e) => {
-    if (e.data === "closeDetailsModal") {
-      modal.style.display = "none";
-      frame.src = "";
-    }
-  });
+// السماح بإغلاق النافذة عند استقبال رسالة من صفحة التفاصيل
+function handleCloseModal(e) {
+  if (e.data === "closeDetailsModal") {
+    modal.style.display = "none";
+    frame.src = "";
+    window.removeEventListener("message", handleCloseModal);
+  }
+}
+window.addEventListener("message", handleCloseModal);
+
 });
 
         detailsTd.appendChild(detailsBtn);
