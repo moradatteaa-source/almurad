@@ -366,11 +366,22 @@ if (user && (user.username === "admin" || (user.roles && user.roles.includes("ad
 };
 
 
-      orders.forEach(o => {
-        const st = (o.status || "").trim();
-        if (counts.hasOwnProperty(st)) counts[st]++;
-        else if (!st) counts[""]++;
-      });
+orders.forEach(o => {
+  let st = (o.status || "").trim();
+
+  // 🟢 توحيد الحالات الفارغة
+  if (!st || st === "" || st === "غير محدد" || typeof st === "undefined") {
+    st = "";
+  }
+
+  // ✅ نحسب فقط الحالات اللي نعرفها مسبقًا
+  if (counts.hasOwnProperty(st)) {
+    counts[st]++;
+  }
+});
+
+
+
 
       document.getElementById("newCount").textContent = counts[""];
       document.getElementById("fixedCount").textContent = counts["مثبت"];
@@ -385,10 +396,12 @@ if (user && (user.username === "admin" || (user.roles && user.roles.includes("ad
       document.getElementById("waitingCount").textContent = counts["بانتظار البضاعة"];
 
     }
+function openOrders(status) {
+  // ✅ إذا الحالة فارغة (طلبات جديدة) نمرر باراميتر فاضي
+  window.location.href = `orders.html?status=${encodeURIComponent(status || "")}`;
+}
 
-    function openOrders(status) {
-      window.location.href = `orders.html?status=${encodeURIComponent(status)}`;
-    }
+
 
     function openNewOrder() {
       window.location.href = "add-order.html";

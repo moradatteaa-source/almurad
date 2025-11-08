@@ -617,9 +617,10 @@ const audio = new Audio("cash-register-kaching.mp3");
 function refreshVisibleOrders() {
   const filtered = allOrders.filter(o => {
     const st = (o.status || "").trim();
-    return currentStatus === "" 
-      ? (st === "" || st === null)
-      : st === currentStatus;
+   return currentStatus === ""
+  ? (st === "" || st === null || st === "غير محدد" || typeof st === "undefined")
+  : st === currentStatus;
+
   });
 
   renderOrders(filtered);
