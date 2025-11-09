@@ -2,15 +2,17 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, minimum-scale=0.5, user-scalable=yes">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=10.0, minimum-scale=0.25, user-scalable=yes">
   <title>الطلبات - نظام المراد</title>
   <style>
 html, body {
-  touch-action: manipulation;
-  -ms-touch-action: manipulation;
+  touch-action: pinch-zoom;   /* ✅ السماح بالتكبير باللمس */
+  -ms-touch-action: pinch-zoom;
+  overflow-x: auto;
+  overflow-y: auto;
   zoom: 1;
-overflow-x: auto; /* ✅ حتى يبقى الجدول مرن ويتكيّف مع التكبير والتصغير */
 }
+
 
 
 /* ✅ منع تكبير الصفحة تلقائيًا عند التركيز على input في الموبايل */
