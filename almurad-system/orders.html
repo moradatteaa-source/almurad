@@ -2,9 +2,22 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
   <title>الطلبات - نظام المراد</title>
   <style>
+html, body {
+  touch-action: manipulation;
+  -ms-touch-action: manipulation;
+  zoom: 1;
+  overflow-x: hidden; /* ✅ هنا التعديل الجديد */
+}
+
+
+/* ✅ منع تكبير الصفحة تلقائيًا عند التركيز على input في الموبايل */
+input, select, textarea, button {
+  font-size: 16px !important;
+  touch-action: manipulation;
+}
 
     body {
       font-family: Tahoma, Arial;
@@ -208,6 +221,10 @@ input, select, textarea {
   <div class="search-bar">
     <input type="text" id="searchInput" placeholder="🔍 ابحث عن أي معلومة...">
   </div>
+<div style="text-align:center;margin:10px 0;">
+  <button onclick="undoChange()" style="background:#043B64;color:white;padding:8px 15px;border:none;border-radius:6px;">↩️ تراجع</button>
+  <button onclick="redoChange()" style="background:#FF6B2D;color:white;padding:8px 15px;border:none;border-radius:6px;">↪️ إعادة</button>
+</div>
 
   <div class="table-container">
     <table>
@@ -563,70 +580,6 @@ previousOrderCount = currentCount;
 
 
 });
-function showNewOrderNotification(count = 1) {
-  // إزالة القديم
-  const oldBar = document.getElementById("newOrderBar");
-  if (oldBar) oldBar.remove();
-
-  // إنشاء الإشعار
-  const bar = document.createElement("div");
-  bar.id = "newOrderBar";
-  bar.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;animation:fadeInUp 0.4s ease">
-      <span style="font-size:28px;background:#fff;color:#28a745;border-radius:50%;
-      width:46px;height:46px;display:flex;align-items:center;justify-content:center;
-      box-shadow:0 0 10px rgba(255,255,255,0.3)">💵</span>
-      <div>
-        <div style="font-weight:bold;font-size:16px;">وصل ${count} طلب جديد${count>1?"ات":""}!</div>
-        <div style="font-size:13px;opacity:0.9;">تحقق الآن من الطلبات</div>
-      </div>
-    </div>
-  `;
-  Object.assign(bar.style, {
-    position: "fixed",
-    bottom: "25px",
-    right: "25px",
-    background: "linear-gradient(135deg,#28a745,#20c997)",
-    color: "white",
-    padding: "14px 22px",
-    borderRadius: "16px",
-    fontFamily: "Tajawal, sans-serif",
-    boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-    zIndex: "999999",
-    cursor: "pointer",
-    opacity: "1",
-    transition: "all 0.6s ease"
-  });
-  document.body.appendChild(bar);
-
- if (window.soundAllowed) {
-const audio = new Audio("cash-register-kaching.mp3");
-  audio.volume = 1.0;
-  audio.play().catch(err => console.warn("🔇 فشل تشغيل الصوت:", err));
-}
-
-
-
-
-  // ✨ تفاعل جميل
-  bar.addEventListener("mouseenter",()=>bar.style.transform="scale(1.05)");
-  bar.addEventListener("mouseleave",()=>bar.style.transform="scale(1)");
-
-  // ⏳ يختفي بعد 6 ثوانٍ
-  setTimeout(()=>{
-    bar.style.opacity="0";
-    bar.style.transform="translateY(20px)";
-    setTimeout(()=>bar.remove(),600);
-  },6000);
-
-  const style=document.createElement("style");
-  style.textContent=`
-    @keyframes fadeInUp {
-      from {opacity:0;transform:translateY(40px);}
-      to {opacity:1;transform:translateY(0);}
-    }`;
-  document.head.appendChild(style);
-}
 
 
 // ✅ متغيرات العرض الجزئي
@@ -666,7 +619,7 @@ renderOrdersPaginated(filtered);
 }
 
 
-function createEditableInput(value, onSave, fieldName = "") {
+function createEditableInput(value, onSave, fieldName = "", orderId = "") {
   const input = document.createElement("input");
   input.value = value || "";
 
@@ -680,15 +633,21 @@ function createEditableInput(value, onSave, fieldName = "") {
     });
     input.addEventListener("change", e => {
       const cleanValue = e.target.value.replace(/,/g, "");
+      recordChange(orderId, fieldName, value, cleanValue); // ✅ نسجل التغيير
       onSave(cleanValue);
     });
   } else {
     // 🟠 باقي الحقول بدون أي فاصلة
-    input.addEventListener("change", e => onSave(e.target.value));
+    input.addEventListener("change", e => {
+      const newVal = e.target.value;
+      recordChange(orderId, fieldName, value, newVal); // ✅ نسجل التغيير
+      onSave(newVal);
+    });
   }
 
   return input;
 }
+
 
 
 
@@ -1066,85 +1025,64 @@ window.addEventListener("message", handleCloseModal);
         tr.appendChild(detailsTd);
 
         // بقية الحقول
-        const fields = [
-          { val: order.code, fn: v => update(ref(db, `orders/${order.id}`), { code: v }) },
-          { val: order.phone1 || order.phone, fn: v => update(ref(db, `orders/${order.id}`), { phone1: v }) },
-          { val: order.phone2, fn: v => update(ref(db, `orders/${order.id}`), { phone2: v }) },
-          { city: true },
-          { area: true },
-          { val: order.address, textarea: true, fn: v => update(ref(db, `orders/${order.id}`), { address: v }) },
-          { val: order.price, fn: v => update(ref(db, `orders/${order.id}`), { price: v }) },
-          { val: order.quantity, fn: v => update(ref(db, `orders/${order.id}`), { quantity: v }) },
-{
-  val: order.productName || order.product,
-  customRender: "tagsInput",
-  fn: v => update(ref(db, `orders/${order.id}`), { productName: v })
-},
+    // ✅ بقية الحقول مع أسماء محددة لكل عمود (تحل مشكلة التراجع)
+const fields = [
+  { name: "code", val: order.code, fn: v => update(ref(db, `orders/${order.id}`), { code: v }) },
+  { name: "phone1", val: order.phone1 || order.phone, fn: v => update(ref(db, `orders/${order.id}`), { phone1: v }) },
+  { name: "phone2", val: order.phone2, fn: v => update(ref(db, `orders/${order.id}`), { phone2: v }) },
+  { name: "city", city: true },
+  { name: "area", area: true },
+  { name: "address", val: order.address, textarea: true, fn: v => update(ref(db, `orders/${order.id}`), { address: v }) },
+  { name: "price", val: order.price, fn: v => update(ref(db, `orders/${order.id}`), { price: v }) },
+  { name: "quantity", val: order.quantity, fn: v => update(ref(db, `orders/${order.id}`), { quantity: v }) },
+  {
+    name: "productName",
+    val: order.productName || order.product,
+    customRender: "tagsInput",
+    fn: v => update(ref(db, `orders/${order.id}`), { productName: v })
+  },
+  { name: "notes", val: order.notes, textarea: true, fn: v => update(ref(db, `orders/${order.id}`), { notes: v }) },
+  { name: "receiptNum", val: order.receiptNum, fn: v => update(ref(db, `orders/${order.id}`), { receiptNum: v }) },
+  {
+    name: "status",
+    val: order.status || "",
+    dropdown: ["مثبت", "قيد المعالجة", "بانتظار البضاعة", "رفض"],
+    fn: async (newStatus) => {
+      console.log("🧠 تم تغيير الحالة:", newStatus);
+      const userName = currentUser;
+      const orderRef = ref(db, `orders/${order.id}`);
+      const snap = await get(orderRef);
+      const existing = snap.exists() ? snap.val() : {};
 
-          { val: order.notes, textarea: true, fn: v => update(ref(db, `orders/${order.id}`), { notes: v }) },
-          { val: order.receiptNum, fn: v => update(ref(db, `orders/${order.id}`), { receiptNum: v }) },
-          {
-   val: order.status || "",
-  // ✅ الحالات المسموح بها فقط
-  dropdown: [
-    "مثبت",
-    "قيد المعالجة",
-    "بانتظار البضاعة",
-    "رفض"
-  ],
-  fn: async (newStatus) => {
+      const historyEntry = { status: newStatus, by: userName, at: new Date().toISOString() };
 
-  console.log("🧠 تم تغيير الحالة:", newStatus);
-  const userName = currentUser;
-  const orderRef = ref(db, `orders/${order.id}`);
-  const snap = await get(orderRef);
-  const existing = snap.exists() ? snap.val() : {};
+      const updates = {
+        status: newStatus,
+        updatedBy: userName,
+        updatedAt: new Date().toISOString(),
+        statusHistory: [...(existing.statusHistory || []), historyEntry],
+      };
 
-  // 🧱 حفظ الحالة الجديدة وسجل التاريخ
-  const historyEntry = {
-    status: newStatus,
-    by: userName,
-    at: new Date().toISOString(),
-  };
+      if (newStatus === "مثبت" || newStatus === "رفض") updates.fixedBy = userName;
+      if (["مثبت", "قيد التوصيل"].includes(newStatus)) await ensureOrderDetailsSaved(order.id);
 
-  const updates = {
-    status: newStatus,
-    updatedBy: userName,
-    updatedAt: new Date().toISOString(),
-    statusHistory: [...(existing.statusHistory || []), historyEntry],
-  };
+      await update(orderRef, updates);
+      console.log(`✅ تم تحديث الحالة إلى ${newStatus}`);
 
-  if (newStatus === "مثبت" || newStatus === "رفض") {
-    updates.fixedBy = userName;
-  }
+      if (["قيد التوصيل", "تم استلام الراجع"].includes(newStatus)) {
+        console.log("🚀 تنفيذ تحديث المخزون من الجدول:", newStatus);
+        await adjustStockOnStatusChange(order.id, newStatus);
+      }
 
-  // ✅ نحفظ أولاً أي تفاصيل ناقصة
-  if (["مثبت", "قيد التوصيل"].includes(newStatus)) {
-    await ensureOrderDetailsSaved(order.id);
-  }
+      const st = (newStatus || "").trim();
+      const shouldHide = (currentStatus === "" && st !== "") || (currentStatus !== "" && st !== currentStatus);
+      if (shouldHide) tr.remove();
+    }
+  },
+  { name: "orderDate", val: order.orderDate || "-", readonly: true },
+  { name: "advertiser", val: order.advertiser, fn: v => update(ref(db, `orders/${order.id}`), { advertiser: v }) }
+];
 
-  // 💾 تحديث حالة الطلب بالـ Realtime
-  await update(orderRef, updates);
-  console.log(`✅ تم تحديث الحالة إلى ${newStatus}`);
-
-  // 🧩 إذا الحالة تتطلب تعديل بالمخزون
-  if (["قيد التوصيل", "تم استلام الراجع"].includes(newStatus)) {
-    console.log("🚀 تنفيذ تحديث المخزون من الجدول:", newStatus);
-    await adjustStockOnStatusChange(order.id, newStatus);
-  }
-
-  // 🔻 إزالة الطلب إذا خرج من الفلترة الحالية
-  const st = (newStatus || "").trim();
-  const shouldHide =
-    (currentStatus === "" && st !== "") ||
-    (currentStatus !== "" && st !== currentStatus);
-  if (shouldHide) tr.remove();
-}
-
-},
-          { val: order.orderDate || "-", readonly: true },
-          { val: order.advertiser, fn: v => update(ref(db, `orders/${order.id}`), { advertiser: v }) }
-        ];
 function createProductTagsCell(productName) {
   const td = document.createElement("td");
   if (!productName) {
@@ -1213,7 +1151,7 @@ else {
     } else if (f.area) {
       const areaDropdown = createDropdown(areas, order.area || "", val => update(ref(db, `orders/${order.id}`), { area: val }));
       td.appendChild(areaDropdown);
-    } else td.appendChild(createEditableInput(f.val, f.fn, f.name || ""));
+    } else td.appendChild(createEditableInput(f.val, f.fn, f.name || "", order.id));
 
   }
 
@@ -1664,6 +1602,58 @@ document.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", renderNextOrders);
   }
 });
+// 🧠 سجل العمليات
+window.historyStack = [];
+window.redoStack = [];
+
+// ✅ دالة لتسجيل أي تعديل
+window.recordChange = function (orderId, field, oldVal, newVal) {
+  if (oldVal === newVal) return;
+  historyStack.push({ orderId, field, oldVal, newVal });
+  redoStack = [];
+  console.log(`🕘 حفظ تعديل: ${field} من "${oldVal}" إلى "${newVal}"`);
+};
+
+// ✅ دالة تنفيذ التراجع
+window.undoChange = async function () {
+  const last = historyStack.pop();
+  if (!last) return showNotification("⚠️ لا يوجد شيء للتراجع عنه", "#043B64");
+
+  const { orderId, field, oldVal } = last;
+  const dbPath = `orders/${orderId}`;
+  if (!field || field.trim() === "") {
+  console.error("⚠️ لا يمكن التراجع لأن اسم الحقل غير معروف.");
+  return;
+}
+
+  await update(ref(db, dbPath), { [field]: oldVal });
+  redoStack.push(last);
+  showNotification(`↩️ تم التراجع عن تعديل ${field}`, "#043B64");
+};
+
+window.redoChange = async function () {
+  const last = redoStack.pop();
+  if (!last) return showNotification("⚠️ لا يوجد شيء لإعادته", "#043B64");
+
+  const { orderId, field, newVal } = last;
+  if (!field || field.trim() === "") {
+    console.error("⚠️ لا يمكن الإعادة لأن اسم الحقل غير معروف.");
+    return;
+  }
+
+  const dbPath = `orders/${orderId}`;
+  await update(ref(db, dbPath), { [field]: newVal });
+  historyStack.push(last);
+  showNotification(`↪️ تمت إعادة تعديل ${field}`, "#FF6B2D");
+};
+
+
+// ⌨️ تفعيل الأزرار بلوحة المفاتيح
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.key === "z") window.undoChange();
+  if (e.ctrlKey && e.key === "y") window.redoChange();
+});
+
 
 </script>
 
@@ -1677,6 +1667,131 @@ document.addEventListener("DOMContentLoaded", () => {
       z-index:999999;
     "></iframe>
   </div>
+<!-- ✅ نظام إشعار الطلب الجديد (نفس كود الداشبورد بالضبط) -->
+<script>
+function showNewOrderNotification(count = 1) {
+  const oldBar = document.getElementById("newOrderBar");
+  if (oldBar) oldBar.remove();
+
+  const bar = document.createElement("div");
+  bar.id = "newOrderBar";
+  bar.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;animation:fadeInUp 0.4s ease">
+      <span style="font-size:28px;background:#fff;color:#28a745;border-radius:50%;
+      width:46px;height:46px;display:flex;align-items:center;justify-content:center;
+      box-shadow:0 0 10px rgba(255,255,255,0.3)">💵</span>
+      <div>
+        <div style="font-weight:bold;font-size:16px;">وصل ${count} طلب جديد${count>1?"ات":""}!</div>
+        <div style="font-size:13px;opacity:0.9;">تحقق الآن من الطلبات</div>
+      </div>
+    </div>
+  `;
+  Object.assign(bar.style, {
+    position: "fixed",
+    bottom: "25px",
+    right: "25px",
+    background: "linear-gradient(135deg,#28a745,#20c997)",
+    color: "white",
+    padding: "14px 22px",
+    borderRadius: "16px",
+    fontFamily: "Tajawal, sans-serif",
+    boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
+    zIndex: "999999",
+    cursor: "pointer",
+    opacity: "1",
+    transition: "all 0.6s ease"
+  });
+  document.body.appendChild(bar);
+
+  // 🎵 تشغيل الصوت فقط إذا تم السماح
+  if (window.soundAllowed) {
+    const audio = new Audio("cash-register-kaching.mp3");
+    audio.volume = 1.0;
+    audio.play().catch(err => console.warn("🔇 فشل تشغيل الصوت:", err));
+  }
+
+  bar.addEventListener("mouseenter",()=>bar.style.transform="scale(1.05)");
+  bar.addEventListener("mouseleave",()=>bar.style.transform="scale(1)");
+
+  setTimeout(()=>{
+    bar.style.opacity="0";
+    bar.style.transform="translateY(20px)";
+    setTimeout(()=>bar.remove(),600);
+  },6000);
+
+  const style=document.createElement("style");
+  style.textContent=`
+    @keyframes fadeInUp {
+      from {opacity:0;transform:translateY(40px);}
+      to {opacity:1;transform:translateY(0);}
+    }`;
+  document.head.appendChild(style);
+}
+
+// ✅ مراقبة الطلبات الجديدة من الفايربيس
+import("https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js").then(async ({ initializeApp }) => {
+  const { getDatabase, ref, onValue } = await import("https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js");
+  const app = initializeApp({
+    apiKey: "AIzaSyDtEJYJrmyP45qS2da8Cuc6y6Jv5VD0Uhc",
+    authDomain: "almurad-system.firebaseapp.com",
+    databaseURL: "https://almurad-system-default-rtdb.firebaseio.com/",
+    projectId: "almurad-system",
+    storageBucket: "almurad-system.appspot.com",
+    messagingSenderId: "911755824405",
+    appId: "1:911755824405:web:2bfbd18ddcf038ca48ad1c"
+  });
+
+  const db = getDatabase(app);
+  const ordersRef = ref(db, "orders");
+  let previousCount = 0;
+
+  onValue(ordersRef, (snapshot) => {
+    if (!snapshot.exists()) return;
+    const data = snapshot.val();
+    const count = Object.keys(data).length;
+    if (previousCount && count > previousCount) {
+      const diff = count - previousCount;
+      showNewOrderNotification(diff);
+    }
+    previousCount = count;
+  });
+});
+
+// ✅ تفعيل إذن الصوت بدون تشغيل ملف
+document.addEventListener("touchstart", function enableSoundOnce() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = ctx.createBufferSource();
+    source.connect(ctx.destination);
+  } catch (e) {
+    console.warn("⚠️ لم يتم تفعيل الصوت بعد:", e);
+  }
+  window.soundAllowed = true;
+  console.log("🔇 تم تفعيل إذن الصوت بدون أي صوت فعلي");
+  document.removeEventListener("touchstart", enableSoundOnce);
+}, { once: true });
+// ✅ دالة عرض إشعارات النظام الموحدة
+window.showNotification = function (message, color = "#043B64") {
+  const existing = document.querySelector(".notification");
+  if (existing) existing.remove();
+
+  const note = document.createElement("div");
+  note.className = "notification";
+  note.textContent = message;
+  note.style.background = color;
+  document.body.appendChild(note);
+
+  // إظهار تدريجي
+  setTimeout(() => note.classList.add("show"), 100);
+
+  // إخفاء بعد 3 ثوانٍ
+  setTimeout(() => {
+    note.classList.remove("show");
+    setTimeout(() => note.remove(), 400);
+  }, 3000);
+};
+
+</script>
 
 </body>
 </html>

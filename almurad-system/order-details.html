@@ -838,7 +838,7 @@ if (phone) {
   let normalizedPhone = phone.replace(/[^\d]/g, '').replace(/^0+/, '');
   if (!normalizedPhone.startsWith('964')) normalizedPhone = '964' + normalizedPhone;
   
-  waBtn.setAttribute("href", `https://wa.me/${normalizedPhone}`);
+waBtn.setAttribute("href", `https://api.whatsapp.com/send?phone=${normalizedPhone}`);
 waBtn.setAttribute("target", "_blank");
 waBtn.setAttribute("rel", "noopener noreferrer");
 
