@@ -237,6 +237,12 @@ input, select, textarea {
       </tbody>
     </table>
   </div>
+  <!-- ✅ زر عرض المزيد -->
+<button id="loadMoreBtn" 
+  style="display:none;margin:20px auto;padding:10px 20px;background:#043B64;color:white;border:none;border-radius:8px;cursor:pointer;font-size:14px;">
+  عرض المزيد ⬇️
+</button>
+
 <script type="module">
   // 🧠 حفظ آخر حالة يفتحها المستخدم + موقع التمرير
 window.addEventListener("beforeunload", () => {
@@ -526,6 +532,19 @@ onValue(ordersRef, (snapshot) => {
   // 🔹 تحويل البيانات إلى مصفوفة
   const data = snapshot.val();
   allOrders = Object.entries(data).map(([id, order]) => ({ id, ...order }));
+  refreshVisibleOrders();
+
+  // ✅ إذا كانت الحالة فارغة (طلبات جديدة)
+  if (!currentStatus) {
+    const newOrders = allOrders.filter(o => {
+      const st = (o.status || "").trim();
+      return !st || st === "غير محدد" || st === null;
+    });
+    currentOrders = newOrders;
+    currentIndex = 0;
+    renderNextOrders(); // عرض أول 50
+  }
+
 
  // 🔹 مقارنة العدد لمعرفة إذا أكو طلب جديد
 const currentCount = Object.keys(data).length;
@@ -542,8 +561,7 @@ previousOrderCount = currentCount;
 
   previousOrderCount = currentCount;
 
-  // 🔹 تحديث الجدول حسب الحالة المختارة
-  refreshVisibleOrders();
+
 });
 function showNewOrderNotification(count = 1) {
   // إزالة القديم
@@ -611,6 +629,27 @@ const audio = new Audio("cash-register-kaching.mp3");
 }
 
 
+// ✅ متغيرات العرض الجزئي
+let currentOrders = [];
+let currentIndex = 0;
+const chunkSize = 50; // ← عدد الطلبات بكل دفعة
+
+function renderNextOrders() {
+  const nextChunk = currentOrders.slice(currentIndex, currentIndex + chunkSize);
+renderOrders(nextChunk, true);
+  currentIndex += chunkSize;
+
+  const btn = document.getElementById("loadMoreBtn");
+  btn.style.display = currentIndex < currentOrders.length ? "block" : "none";
+}
+
+// ✅ دالة عرض أول دفعة
+function renderOrdersPaginated(orders) {
+  currentOrders = orders;
+  currentIndex = 0;
+  ordersBody.innerHTML = "";
+  renderNextOrders(); // أول 50 فقط بالبداية
+}
 
 
 // 🔄 دالة لتحديث العرض تلقائي حسب الحالة الحالية
@@ -623,7 +662,7 @@ function refreshVisibleOrders() {
 
   });
 
-  renderOrders(filtered);
+renderOrdersPaginated(filtered);
 }
 
 
@@ -924,9 +963,9 @@ input.addEventListener("input", e => {
   return td;
 }
 
-    // عرض الطلبات
-    function renderOrders(orders) {
-      ordersBody.innerHTML = "";
+  function renderOrders(orders, append = false) {
+  if (!append) ordersBody.innerHTML = "";
+
       if (orders.length === 0) {
         ordersBody.innerHTML = `<tr><td colspan="17">🚫 لا توجد طلبات في هذه الحالة</td></tr>`;
         return;
@@ -1186,12 +1225,65 @@ else {
       });
     }
 
-    // 🔍 البحث
-    searchInput.addEventListener("input", e => {
-      const q = e.target.value.trim();
-      const filtered = allOrders.filter(o => Object.values(o).some(v => v && v.toString().includes(q)));
-      renderOrders(filtered);
-    });
+// ✅ بحث يدوي خفيف وسريع
+searchInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    runSearch();
+  }
+});
+
+// ✅ زر بحث يدوي
+const searchBtn = document.createElement("button");
+searchBtn.textContent = "🔍 بحث";
+searchBtn.style = `
+  margin-right:10px;
+  padding:8px 15px;
+  background:#043B64;
+  color:#fff;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:13px;
+`;
+searchBtn.addEventListener("click", runSearch);
+document.querySelector(".search-bar").appendChild(searchBtn);
+
+function runSearch() {
+  const q = searchInput.value.trim().toLowerCase();
+  if (!q) {
+    renderOrders(allOrders); // إذا فارغ → رجّع كل الطلبات
+    return;
+  }
+
+  const filtered = allOrders.filter(o => {
+    const code = String(o.code || "").toLowerCase();
+    const phone1 = String(o.phone1 || "").toLowerCase();
+    const product = String(o.productName || "").toLowerCase();
+    const receipt = String(o.receiptNum || "").toLowerCase();
+
+    return (
+      code.includes(q) ||
+      phone1.includes(q) ||
+      product.includes(q) ||
+      receipt.includes(q)
+    );
+  });
+
+  renderOrders(filtered.slice(0, 300));
+}
+
+
+// ✅ لما المستخدم يمسح النص تمامًا، ترجع الطلبات كلها فورًا
+searchInput.addEventListener("input", () => {
+  if (searchInput.value.trim() === "") {
+renderOrdersPaginated(allOrders);
+  }
+});
+
+
+
+
 
     // 🗑 حذف المحددة
     document.getElementById("deleteSelected").addEventListener("click", () => {
@@ -1565,6 +1657,14 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.removeItem("restoreScrollAfterReturn");
   }
 });
+// ✅ تفعيل زر عرض المزيد بعد تحميل الصفحة
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("loadMoreBtn");
+  if (btn) {
+    btn.addEventListener("click", renderNextOrders);
+  }
+});
+
 </script>
 
   <!-- ✅ نافذة تفاصيل الطلب الكاملة (منسوخة من صفحة التفاصيل) -->
@@ -1577,199 +1677,7 @@ document.addEventListener("DOMContentLoaded", () => {
       z-index:999999;
     "></iframe>
   </div>
-<!-- ✅ تفعيل الصوت بصمت عند أول ضغطة فقط -->
-<script>
-document.addEventListener("click", () => {
-  if (!window.soundAllowed) {
-    window.soundAllowed = true;
-  }
-}, { once: true }); // ← يعني يشتغل مرة وحدة فقط
-</script>
-
-</script>
-<script>
-// ✅ تفعيل الصوت عند أول تفاعل
-document.addEventListener("click", () => {
-  if (!window.soundAllowed) {
-    window.soundAllowed = true;
-    console.log("🔊 تم تفعيل الصوت بنجاح");
-  }
-}, { once: true });
-
-// ✅ تشغيل الصوت مع إشعار الطلب الجديد
-function playNotificationSound() {
-  if (!window.soundAllowed) return; // 🔇 المستخدم ما فعل الصوت بعد
-  const audio = new Audio("cash-register-kaching.mp3");
-  audio.volume = 1.0;
-  audio.play().catch(err => console.warn("🔇 لم يتم تشغيل الصوت:", err));
-}
-
-// ✅ تعديل دالة الإشعار لتشغل الصوت دائمًا
-window.showNewOrderNotification = function(count = 1) {
-  const oldBar = document.getElementById("newOrderBar");
-  if (oldBar) oldBar.remove();
-
-  const bar = document.createElement("div");
-  bar.id = "newOrderBar";
-  bar.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;animation:fadeInUp 0.4s ease">
-      <span style="font-size:28px;background:#fff;color:#28a745;border-radius:50%;
-      width:46px;height:46px;display:flex;align-items:center;justify-content:center;
-      box-shadow:0 0 10px rgba(255,255,255,0.3)">💵</span>
-      <div>
-        <div style="font-weight:bold;font-size:16px;">وصل ${count} طلب جديد${count>1?"ات":""}!</div>
-        <div style="font-size:13px;opacity:0.9;">تحقق الآن من الطلبات</div>
-      </div>
-    </div>
-  `;
-  Object.assign(bar.style, {
-    position: "fixed",
-    bottom: "25px",
-    right: "25px",
-    background: "linear-gradient(135deg,#28a745,#20c997)",
-    color: "white",
-    padding: "14px 22px",
-    borderRadius: "16px",
-    fontFamily: "Tajawal, sans-serif",
-    boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-    zIndex: "999999",
-    cursor: "pointer",
-    opacity: "1",
-    transition: "all 0.6s ease"
-  });
-  document.body.appendChild(bar);
-
-  // 🔊 تشغيل الصوت فوراً مع ظهور الإشعار
-  playNotificationSound();
-
-  // ✨ تأثير بسيط
-  bar.addEventListener("mouseenter",()=>bar.style.transform="scale(1.05)");
-  bar.addEventListener("mouseleave",()=>bar.style.transform="scale(1)");
-
-  // ⏳ يختفي بعد 6 ثوانٍ
-  setTimeout(()=>{
-    bar.style.opacity="0";
-    bar.style.transform="translateY(20px)";
-    setTimeout(()=>bar.remove(),600);
-  },6000);
-};
-</script>
-<!-- ✅ تفعيل الصوت + الاهتزاز عند الطلب الجديد -->
-<script>
-/* 🔹 تفعيل الصوت بالموبايل أول لمسة */
-document.addEventListener("click", function enableSoundOnce() {
-  const silent = new Audio("cash-register-kaching.mp3");
-  silent.volume = 0; // صوت صامت
-  silent.play().catch(()=>{});
-  window.soundAllowed = true;
-  console.log("🔊 تم تفعيل الصوت على الموبايل بنجاح");
-  document.removeEventListener("click", enableSoundOnce);
-}, { once: true });
-
-/* 🔹 تشغيل صوت الإشعار + الاهتزاز عند وصول طلب */
-function playNotificationSound() {
-  if (!window.soundAllowed) return; // المستخدم ما فعّل الصوت بعد
-  try {
-    const audio = new Audio("cash-register-kaching.mp3");
-    audio.volume = 1.0;
-    audio.play().catch(err => console.warn("🔇 لم يتم تشغيل الصوت:", err));
-
-    // 📳 اهتزاز بسيط عند وصول الطلب (مدعوم في معظم الموبايلات)
-    if (navigator.vibrate) {
-      navigator.vibrate([100, 50, 150]); // يهتز 100ms ثم توقف 50ms ثم يهتز 150ms
-    }
-  } catch (err) {
-    console.warn("⚠️ خطأ أثناء تشغيل الصوت أو الاهتزاز:", err);
-  }
-}
-
-/* 🔹 تعديل دالة الإشعار لتستخدم الصوت + الاهتزاز */
-window.showNewOrderNotification = function(count = 1) {
-  const oldBar = document.getElementById("newOrderBar");
-  if (oldBar) oldBar.remove();
-
-  const bar = document.createElement("div");
-  bar.id = "newOrderBar";
-  bar.innerHTML = `
-    <div style="display:flex;align-items:center;gap:12px;animation:fadeInUp 0.4s ease">
-      <span style="font-size:28px;background:#fff;color:#28a745;border-radius:50%;
-      width:46px;height:46px;display:flex;align-items:center;justify-content:center;
-      box-shadow:0 0 10px rgba(255,255,255,0.3)">💵</span>
-      <div>
-        <div style="font-weight:bold;font-size:16px;">وصل ${count} طلب جديد${count>1?"ات":""}!</div>
-        <div style="font-size:13px;opacity:0.9;">تحقق الآن من الطلبات</div>
-      </div>
-    </div>
-  `;
-  Object.assign(bar.style, {
-    position: "fixed",
-    bottom: "25px",
-    right: "25px",
-    background: "linear-gradient(135deg,#28a745,#20c997)",
-    color: "white",
-    padding: "14px 22px",
-    borderRadius: "16px",
-    fontFamily: "Tajawal, sans-serif",
-    boxShadow: "0 8px 25px rgba(0,0,0,0.3)",
-    zIndex: "999999",
-    cursor: "pointer",
-    opacity: "1",
-    transition: "all 0.6s ease"
-  });
-  document.body.appendChild(bar);
-
-  // 🔊📳 صوت + اهتزاز عند الإشعار
-  playNotificationSound();
-
-  // ✨ تفاعل
-  bar.addEventListener("mouseenter",()=>bar.style.transform="scale(1.05)");
-  bar.addEventListener("mouseleave",()=>bar.style.transform="scale(1)");
-
-  setTimeout(()=>{
-    bar.style.opacity="0";
-    bar.style.transform="translateY(20px)";
-    setTimeout(()=>bar.remove(),600);
-  },6000);
-};
-
-// 🧠 دالة عامة لعرض إشعار علوي
-function showNotification(message, color = "#FF6B2D") {
-  const existing = document.querySelector(".notification");
-  if (existing) existing.remove();
-
-  const note = document.createElement("div");
-  note.className = "notification";
-  note.style.background = color;
-  note.textContent = message;
-
-  document.body.appendChild(note);
-
-  setTimeout(() => note.classList.add("show"), 50);
-  setTimeout(() => {
-    note.classList.remove("show");
-    setTimeout(() => note.remove(), 300);
-  }, 3000);
-}
-// ✅ بعد الحفظ، نرجع المستخدم لنفس الحالة والمكان القديم تماماً
-const lastStatus = localStorage.getItem("lastStatusView");
-const lastScroll = localStorage.getItem("previousScrollPosition");
-
-// 🔹 بعد الحفظ، نغلق النافذة المنبثقة بدون إعادة تحميل صفحة الطلبات
-if (window.parent) {
-  localStorage.setItem("restoreScrollAfterReturn", lastScroll || "0");
-  window.parent.postMessage("closeDetailsModal", "*");
-}
-
-// ✅ زر الرجوع يشتغل دائماً بنفس الطريقة
-document.getElementById("backBtn").addEventListener("click", () => {
-  if (window.parent) {
-    window.parent.postMessage("closeDetailsModal", "*");
-  }
-});
-
-
-</script>
-
 
 </body>
 </html>
+

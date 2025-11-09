@@ -299,6 +299,22 @@
 </head>
 <body>
   <header>📦 تفاصيل المخزون</header>
+  <!-- ✅ شريط البحث والعداد -->
+<div id="topBar" style="
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:#fff;
+  box-shadow:0 2px 6px rgba(0,0,0,0.1);
+  padding:10px 15px;
+  margin:10px;
+  border-radius:10px;
+">
+  <input id="searchInput" type="text" placeholder="🔍 ابحث عن منتج..."
+    style="flex:1;padding:8px 12px;border:1px solid #ccc;border-radius:8px;font-size:15px;font-family:'Tajawal';outline:none;margin-left:10px;">
+  <div id="productCount" style="font-weight:bold;color:#043B64;font-size:15px;">إجمالي المنتجات: 0</div>
+</div>
+
   <div class="container" id="productGrid"></div>
 
   <div class="details" id="productDetails">
@@ -327,6 +343,9 @@ storageBucket: "almurad-system.firebasestorage.app",
   const productGrid = document.getElementById("productGrid");
   const details = document.getElementById("productDetails");
   const detailsContent = document.getElementById("detailsContent");
+const searchInput = document.getElementById("searchInput");
+const productCount = document.getElementById("productCount");
+let allProductsList = []; // 🧠 نخزن جميع المنتجات مؤقتًا للبحث
 
   // ✅ تحميل المنتجات من الريل تايم
   async function loadProducts() {
@@ -340,7 +359,10 @@ storageBucket: "almurad-system.firebasestorage.app",
 
     const data = snapshot.val();
 
-    for (const [name, p] of Object.entries(data)) {
+allProductsList = Object.entries(data); // 🧠 نخزن كل المنتجات للبحث
+productCount.textContent = `إجمالي المنتجات: ${allProductsList.length}`;
+
+for (const [name, p] of allProductsList) {
       const img = p.images?.length ? p.images[0] : "https://via.placeholder.com/150?text=No+Image";
       const totalQty = p.stock ? Object.values(p.stock).reduce((a, b) => a + Number(b || 0), 0) : (p.totalQty || 0);
 
@@ -646,6 +668,41 @@ const productRef = ref(db, "warehouse/" + safeName);
     details.style.display = "none";
     productGrid.style.display = "flex";
   };
+// ✅ دالة البحث الفوري عن المنتجات
+searchInput.addEventListener("input", () => {
+  const q = searchInput.value.trim().toLowerCase();
+  productGrid.innerHTML = "";
+
+  const filtered = allProductsList.filter(([name, p]) => {
+    return name.toLowerCase().includes(q) ||
+           (p.desc || "").toLowerCase().includes(q);
+  });
+
+  productCount.textContent = `إجمالي المنتجات: ${filtered.length}`;
+
+  if (filtered.length === 0) {
+    productGrid.innerHTML = `<p style="text-align:center;color:#888;">🚫 لا توجد نتائج مطابقة</p>`;
+    return;
+  }
+
+  for (const [name, p] of filtered) {
+    const img = p.images?.length ? p.images[0] : "https://via.placeholder.com/150?text=No+Image";
+    const totalQty = p.stock ? Object.values(p.stock).reduce((a, b) => a + Number(b || 0), 0) : (p.totalQty || 0);
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <img src="${img}" alt="${name}">
+      <div class="card-content">
+        <h3>${name}</h3>
+        <p>الكمية الإجمالية: ${totalQty}</p>
+        <span>💰 ${p.sellPrice || 0} د.ع</span>
+      </div>
+    `;
+    card.onclick = () => showDetails(name, p, totalQty);
+    productGrid.appendChild(card);
+  }
+});
 
   loadProducts();
 </script>
