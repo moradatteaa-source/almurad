@@ -607,6 +607,47 @@ let previousOrderCount = 0;
 
 // 🟢 مراقبة الطلبات الجديدة + تحديث الجدول معاً
 const ordersRef = ref(db, "orders");
+// ✅ مراقبة جميع الطلبات وإضافة fixedBy و fixedAt تلقائياً حسب المصدر
+onValue(ordersRef, async (snapshot) => {
+  if (!snapshot.exists()) return;
+  const data = snapshot.val();
+  const updates = {};
+
+  Object.entries(data).forEach(([id, order]) => {
+    const status = (order.status || "").trim();
+
+    // نتحقق فقط من الحالات "مثبت" أو "رفض"
+    if ((status === "مثبت" || status === "رفض") && !order.fixedBy) {
+      let sourceLabel = "نظام تلقائي";
+
+      // 🧠 نحاول نحدد مصدر الطلب (استمارة تيك توك أو شيت أو واجهة)
+      if (order.source && order.source.toLowerCase().includes("tiktok")) {
+        sourceLabel = "تيك توك";
+      } else if (order.source && order.source.toLowerCase().includes("sheet")) {
+        sourceLabel = "شيت";
+      } else if (order.createdBy) {
+        sourceLabel = order.createdBy; // إذا كان بي اسم الموظف من البداية
+      } else {
+        sourceLabel =
+          sessionStorage.getItem("userName") ||
+          localStorage.getItem("userName") ||
+          "نظام تلقائي";
+      }
+
+      // نجهز التحديثات
+      updates[`orders/${id}/fixedBy`] = sourceLabel;
+      updates[`orders/${id}/fixedAt`] = new Date().toISOString();
+    }
+  });
+
+  // 💾 تنفيذ التحديثات كلها مرة وحدة لو أكو شي ناقص
+  if (Object.keys(updates).length > 0) {
+    const db = getDatabase();
+    await update(ref(db), updates);
+    console.log("🧩 تم تصحيح fixedBy و fixedAt تلقائياً للطلبات المثبتة أو المرفوضة");
+  }
+});
+
 onValue(ordersRef, (snapshot) => {
   if (!snapshot.exists()) {
     ordersBody.innerHTML = `<tr><td colspan="17">🚫 لا توجد طلبات</td></tr>`;
@@ -805,7 +846,9 @@ dropdown.style.zIndex = "9999999";
   }
 
   // 🧠 عرض عند الكتابة
-  input.addEventListener("focus", () => showDropdown(input.value.trim()));
+// ✅ الآن المنسدلة تفتح دائمًا حتى لو الحقل يحتوي على قيمة
+input.addEventListener("focus", () => showDropdown(""));
+input.addEventListener("click", () => showDropdown(""));
   input.addEventListener("input", (e) => showDropdown(e.target.value.trim()));
 
   // ✅ السماح بكتابة حالة جديدة بالإنتر
@@ -1113,38 +1156,51 @@ const fields = [
   {
     name: "status",
     val: order.status || "",
-    dropdown: ["مثبت", "قيد المعالجة", "بانتظار البضاعة", "رفض"],
-    fn: async (newStatus) => {
-      console.log("🧠 تم تغيير الحالة:", newStatus);
-      const userName = currentUser;
-      const orderRef = ref(db, `orders/${order.id}`);
-      const snap = await get(orderRef);
-      const existing = snap.exists() ? snap.val() : {};
+  dropdown: ["مثبت", "بانتظار البضاعة", "قيد المعالجة", "رفض"],fn: async (newStatus) => {
+  console.log("🧠 تم تغيير الحالة:", newStatus);
+  const userName = currentUser;
+  const orderRef = ref(db, `orders/${order.id}`);
+  const snap = await get(orderRef);
+  const existing = snap.exists() ? snap.val() : {};
 
-      const historyEntry = { status: newStatus, by: userName, at: new Date().toISOString() };
+  const historyEntry = { status: newStatus, by: userName, at: new Date().toISOString() };
 
-      const updates = {
-        status: newStatus,
-        updatedBy: userName,
-        updatedAt: new Date().toISOString(),
-        statusHistory: [...(existing.statusHistory || []), historyEntry],
-      };
+  const updates = {
+    status: newStatus,
+    updatedBy: userName,
+    updatedAt: new Date().toISOString(),
+    statusHistory: [...(existing.statusHistory || []), historyEntry],
+  };
 
-      if (newStatus === "مثبت" || newStatus === "رفض") updates.fixedBy = userName;
-      if (["مثبت", "قيد التوصيل"].includes(newStatus)) await ensureOrderDetailsSaved(order.id);
+  // ✅ فقط أول من يثبت أو يرفض الطلب هو اللي يُسجل باسمه
+  if ((newStatus === "مثبت" || newStatus === "رفض") && !existing.fixedBy) {
+    updates.fixedBy =
+      existing.fixedBy ||
+      sessionStorage.getItem("userName") ||
+      localStorage.getItem("userName") ||
+      currentUser ||
+      "غير محدد";
+    updates.fixedAt = existing.fixedAt || new Date().toISOString();
+  }
 
-      await update(orderRef, updates);
-      console.log(`✅ تم تحديث الحالة إلى ${newStatus}`);
+  if (["مثبت", "قيد التوصيل"].includes(newStatus))
+    await ensureOrderDetailsSaved(order.id);
 
-      if (["قيد التوصيل", "تم استلام الراجع"].includes(newStatus)) {
-        console.log("🚀 تنفيذ تحديث المخزون من الجدول:", newStatus);
-        await adjustStockOnStatusChange(order.id, newStatus);
-      }
+  await update(orderRef, updates);
+  console.log(`✅ تم تحديث الحالة إلى ${newStatus}`);
 
-      const st = (newStatus || "").trim();
-      const shouldHide = (currentStatus === "" && st !== "") || (currentStatus !== "" && st !== currentStatus);
-      if (shouldHide) tr.remove();
-    }
+  if (["قيد التوصيل", "تم استلام الراجع"].includes(newStatus)) {
+    console.log("🚀 تنفيذ تحديث المخزون من الجدول:", newStatus);
+    await adjustStockOnStatusChange(order.id, newStatus);
+  }
+
+  const st = (newStatus || "").trim();
+  const shouldHide =
+    (currentStatus === "" && st !== "") ||
+    (currentStatus !== "" && st !== currentStatus);
+  if (shouldHide) tr.remove();
+}
+
   },
   { name: "orderDate", val: order.orderDate || "-", readonly: true },
   { name: "advertiser", val: order.advertiser, fn: v => update(ref(db, `orders/${order.id}`), { advertiser: v }) }

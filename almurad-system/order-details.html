@@ -311,15 +311,44 @@ body, html {
   margin: auto;
 }
 
-.bottom-actions {
+.top-contact-buttons {
   position: fixed;
-  bottom: 70px; /* 🔼 كان 10 صار 70 حتى يصعد للأعلى */
-  right: 15px;
+  top: 80px;
+  left: 15px;
   display: flex;
-  flex-direction: row;
-  gap: 14px;
-  z-index: 9999; /* 🔹 تأكد يبقى فوق كل العناصر */
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 10000;
 }
+
+.top-contact-buttons .contact-btn {
+  width: 50px;
+  height: 50px;
+  line-height: 50px;
+  font-size: 24px;
+  border-radius: 50%;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.3);
+  transition: transform 0.2s ease;
+}
+
+.top-contact-buttons .contact-btn:hover {
+  transform: scale(1.08);
+}
+
+.top-contact-buttons .whatsapp {
+  background: #25D366;
+}
+
+.top-contact-buttons .contact-btn:not(.whatsapp) {
+  background: #043B64;
+}
+
+
+
 
 
 .contact-btn {
@@ -338,13 +367,44 @@ input, textarea {
     bottom: 80px; /* مخصص للموبايل */
   }
 }
+.undo-redo-fixed {
+  position: fixed;
+  top: 15px;         /* 🔹 خليها بالأعلى بدل bottom */
+  left: 15px;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  z-index: 10000;
+}
+
+.undo-redo-fixed button {
+  background: #043B64;
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+}
+.undo-redo-fixed button:hover {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
 
   </style>
 </head>
 
 <body>
+
   <header>📦 تفاصيل الطلب - نظام المراد</header>
 
+<div class="undo-redo-fixed">
+  <button id="undoBtn">↩️</button>
+  <button id="redoBtn">↪️</button>
+</div>
   <div class="container">
 
     <div class="card">
@@ -455,11 +515,8 @@ input, textarea {
 
     <button id="saveBtn">💾 حفظ التعديلات</button>
     <button id="backBtn">🔙 رجوع</button>
-  </div>
 
-  <div class="bottom-actions">
-    <a id="callBtn" class="contact-btn" title="اتصال">📞</a>
-    <a id="whatsappBtn" class="contact-btn whatsapp" title="واتساب">💬</a>
+  </div>
   </div>
     <!-- سكربت الفايربيس -->
   <script type="module">
@@ -478,8 +535,9 @@ input, textarea {
     };
 
     const app = initializeApp(firebaseConfig);
-    const db = getDatabase(app);
-    const orderId = localStorage.getItem("selectedOrder");
+const db = getDatabase(app);
+window.orderId = localStorage.getItem("selectedOrder");
+
 
     // 🔹 دالة إنشاء منسدلات (نفس الأصلية)
     function createDropdown(options, selected, onChange) {
@@ -893,6 +951,11 @@ statusDiv.appendChild(statusDropdown);
         data.extraProducts.forEach(p => addExtraProduct(p));
       }
     }
+  // ✅ حفظ القيم الأصلية لكل الحقول للمقارنة لاحقاً
+  ["code","phone1","phone2","address","price","quantity","notes","advertiser"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.dataset.oldValue = el.value;
+  });
 
     // 🔹 عند الحفظ
    // 🔹 عند الحفظ
@@ -1031,25 +1094,41 @@ if (window.parent) {
 
 
 
-
-  document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", async () => {
   await loadOrder();
-});
-// ✅ تنسيق السعر والعدد بفاصلة أثناء الكتابة
-["price", "quantity"].forEach(id => {
-  const input = document.getElementById(id);
-  if (!input) return;
 
-  input.addEventListener("input", e => {
-    let val = e.target.value.replace(/[^\d]/g, ""); // نزيل أي شيء مو رقم
-    if (val) {
-      e.target.value = new Intl.NumberFormat("en-US").format(val); // نضيف الفاصلة
-    }
+  // ✅ مراقبة كل الحقول لتسجيل أي تعديل (نفس نظام الطلبات)
+  ["code","phone1","phone2","address","price","quantity","notes","advertiser"].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    // نخزن القيمة الأصلية
+    el.dataset.oldValue = el.value;
+
+    // عند التغيير نسجل التعديل بالتاريخ
+    el.addEventListener("change", () => {
+      const oldVal = el.dataset.oldValue || "";
+      const newVal = el.value.replace(/,/g, ""); // نحذف الفواصل من القيمة الجديدة قبل التسجيل
+      recordChange(orderId, id, oldVal, newVal);
+      el.dataset.oldValue = newVal;
+    });
   });
 
-  input.addEventListener("change", e => {
-    // نحذف الفواصل قبل الحفظ في قاعدة البيانات
-    e.target.value = e.target.value.replace(/,/g, "");
+  // ✅ تنسيق السعر والعدد بفاصلة أثناء الكتابة
+  ["price", "quantity"].forEach(id => {
+    const input = document.getElementById(id);
+    if (!input) return;
+
+    input.addEventListener("input", e => {
+      let val = e.target.value.replace(/[^\d]/g, ""); // نزيل أي شيء غير رقم
+      if (val) {
+        e.target.value = new Intl.NumberFormat("en-US").format(val); // نضيف الفاصلة
+      }
+    });
+
+    input.addEventListener("change", e => {
+      e.target.value = e.target.value.replace(/,/g, ""); // نحذف الفواصل قبل الحفظ
+    });
   });
 });
 
@@ -1268,22 +1347,107 @@ document.addEventListener("DOMContentLoaded", () => {
 
   </script>
   <!-- ✅ تفعيل إذن الصوت بدون أي صوت فعلي (صامت تمامًا) -->
-<script>
-document.addEventListener("touchstart", function enableSoundOnce() {
-  try {
-    // إنشاء AudioContext فقط لتفعيل صلاحية الصوت بدون تشغيل أي ملف
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const source = ctx.createBufferSource();
-    source.connect(ctx.destination);
-    // ما نحتاج نشغل أي شيء فعلي — مجرد فتح الإذن
-  } catch (e) {
-    console.warn("⚠️ لم يتم تفعيل الصوت بعد:", e);
-  }
-  window.soundAllowed = true; // ✅ تفعيل الإذن
-  console.log("🔇 تم تفعيل إذن الصوت بدون أي صوت فعلي");
-  document.removeEventListener("touchstart", enableSoundOnce);
-}, { once: true });
+<script type="module">
+import { getDatabase, ref, update } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+window.orderId = localStorage.getItem("selectedOrder"); // ✅ تأكيد رقم الطلب
+
+// 🧠 سجل العمليات
+window.historyStack = [];
+window.redoStack = [];
+
+// ✅ تسجيل أي تعديل
+window.recordChange = function (orderId, field, oldVal, newVal) {
+  if (oldVal === newVal) return;
+  window.historyStack.push({ orderId, field, oldVal, newVal });
+  window.redoStack = [];
+  console.log(`🕘 تم حفظ تعديل ${field}: من "${oldVal}" إلى "${newVal}"`);
+};
+
+// ✅ تراجع
+window.undoChange = async function () {
+  const last = window.historyStack.pop();
+  if (!last) return showToast("⚠️ لا يوجد شيء للتراجع عنه");
+
+  const { orderId, field, oldVal } = last;
+
+  // 🔹 رجّع القيمة بالحقل مباشرة
+  const input = document.getElementById(field);
+  if (input) input.value = oldVal;
+
+  // 🔹 رجّع القيمة أيضًا بقاعدة البيانات
+  await update(ref(db, `orders/${orderId}`), { [field]: oldVal });
+
+  window.redoStack.push(last);
+  showToast(`↩️ تم التراجع عن تعديل ${field}`);
+};
+
+// ✅ إعادة
+window.redoChange = async function () {
+  const last = window.redoStack.pop();
+  if (!last) return showToast("⚠️ لا يوجد شيء لإعادته");
+
+  const { orderId, field, newVal } = last;
+
+  // 🔹 رجّع القيمة بالحقل مباشرة
+  const input = document.getElementById(field);
+  if (input) input.value = newVal;
+
+  // 🔹 رجّع القيمة أيضًا بقاعدة البيانات
+  await update(ref(db, `orders/${orderId}`), { [field]: newVal });
+
+  window.historyStack.push(last);
+  showToast(`↪️ تمت إعادة تعديل ${field}`);
+};
+
+
+// ✅ اختصارات الكيبورد
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && e.key === "z") undoChange();
+  if (e.ctrlKey && e.key === "y") redoChange();
+});
+
+// ✅ ننتظر تحميل الصفحة قبل الربط بالأزرار
+document.addEventListener("DOMContentLoaded", () => {
+  const undoBtn = document.getElementById("undoBtn");
+  const redoBtn = document.getElementById("redoBtn");
+  if (undoBtn) undoBtn.onclick = () => undoChange();
+  if (redoBtn) redoBtn.onclick = () => redoChange();
+});
+
+
+// ✅ إشعار بسيط بدل alert
+function showToast(msg) {
+  const toast = document.createElement("div");
+  toast.textContent = msg;
+  Object.assign(toast.style, {
+    position: "fixed",
+    bottom: "80px",
+    left: "15px",
+    background: "#043B64",
+    color: "#fff",
+    padding: "10px 15px",
+    borderRadius: "8px",
+    fontSize: "13px",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+    zIndex: 99999,
+    opacity: 0,
+    transition: "opacity 0.3s ease"
+  });
+  document.body.appendChild(toast);
+  requestAnimationFrame(() => (toast.style.opacity = 1));
+  setTimeout(() => {
+    toast.style.opacity = 0;
+    setTimeout(() => toast.remove(), 500);
+  }, 1800);
+}
 </script>
+
+
+<!-- ✅ أزرار الاتصال والواتساب بالأعلى يسار -->
+<div class="top-contact-buttons">
+  <a id="callBtn" class="contact-btn" title="اتصال">📞</a>
+  <a id="whatsappBtn" class="contact-btn whatsapp" title="واتساب">💬</a>
+</div>
 
 </body>
 </html> 
