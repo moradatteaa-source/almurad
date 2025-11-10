@@ -135,6 +135,16 @@
   height: 260px;
   object-fit: contain;
 }
+.slider {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  gap: 0;
+}
+.slider::-webkit-scrollbar {
+  display: none;
+}
 
 
 
@@ -159,24 +169,30 @@
     .prev { left: 10px; }
     .next { right: 10px; }
 
-    /* ======= الأيقونة البرتقالية لتحميل الصور ======= */
-    .download-icon {
-      position: absolute;
-      bottom: 12px;
-      right: 12px;
-      background: var(--orange);
-      color: white;
-      border: none;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      font-size: 18px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
+  .download-icon {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--orange);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 55px;
+  height: 55px;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+  z-index: 9999;
+  transition: transform 0.2s ease;
+}
+.download-icon:hover {
+  transform: scale(1.1);
+  background: #ff864a;
+}
+
 
     /* ======= النصوص داخل التفاصيل ======= */
     p strong {
@@ -198,6 +214,18 @@
       margin-top: 10px;
       resize: none;
     }
+textarea {
+  color: #043B64 !important; /* 🔹 لون النص أزرق داكن وواضح */
+  background: #fff !important; /* 🔹 خلفية بيضاء */
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.6;
+  opacity: 1 !important;
+}
+textarea::placeholder {
+  color: #666 !important;
+  opacity: 1;
+}
 
     .save-btn {
       display: none;
@@ -381,287 +409,253 @@ for (const [name, p] of allProductsList) {
     }
   }
 
-  // ✅ عرض التفاصيل + السلايدر + التحكمات
-  function showDetails(name, product, totalQty) {
-    productGrid.style.display = "none";
-    details.style.display = "block";
+function showDetails(name, product, totalQty) {
+  productGrid.style.display = "none";
+  details.style.display = "block";
 
-const imgArray = Array.isArray(product.images)
-  ? product.images
-  : Object.values(product.images || {});
-const imgs = imgArray.map(url => `<img src="${url}" alt="${name}">`).join("");
-    detailsContent.innerHTML = `
-      <h2 style="font-size:18px; margin-bottom:10px; color:var(--orange);">${name}</h2>
+  // تنظيف الصفحة أولاً
+  detailsContent.innerHTML = "";
 
-      <div class="slider-wrapper">
-        <div class="slider" id="slider">${imgs}</div>
-        <button class="nav-btn prev" onclick="prevSlide()">❮</button>
-        <button class="nav-btn next" onclick="nextSlide()">❯</button>
-        <button class="download-icon" id="downloadIcon">⬇️</button>
-      </div>
+  // ✅ إنشاء المحتوى الكامل (السلايدر + التفاصيل) قبل أي تعامل مع العناصر
+  const imgArray = Array.isArray(product.images)
+    ? product.images
+    : Object.values(product.images || {});
 
-      <p><strong>💰 سعر البيع:</strong> <span style="color:var(--orange);">${product.sellPrice || "-"}</span> د.ع</p>
-      <p><strong>📦 الكمية الإجمالية:</strong> <span style="color:var(--orange);">${totalQty}</span></p>
+  // بناء HTML أولي
+  let contentHTML = `
+    <h2 style="font-size:18px; margin-bottom:10px; color:var(--orange);">${name}</h2>
+    <p><strong>💰 سعر البيع:</strong> <span style="color:var(--orange);">${product.sellPrice || "-"}</span> د.ع</p>
+    <p><strong>📦 الكمية الإجمالية:</strong> <span style="color:var(--orange);">${totalQty}</span></p>
 
-      <h4 style="color:var(--blue); margin-top:15px;">🧩 المتغيرات</h4>
-      <table>
-        <thead>
-          <tr><th>اللون / القياس</th><th>الكمية</th></tr>
-        </thead>
-        <tbody>
-          ${product.stock
-            ? Object.entries(product.stock).map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("")
-            : "<tr><td colspan='2'>لا توجد متغيرات</td></tr>"}
-        </tbody>
-      </table>
+    <h4 style="color:var(--blue); margin-top:15px;">🧩 المتغيرات</h4>
+    <table>
+      <thead><tr><th>اللون / القياس</th><th>الكمية</th></tr></thead>
+      <tbody>
+        ${
+          product.stock
+            ? Object.entries(product.stock)
+                .map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`)
+                .join("")
+            : "<tr><td colspan='2'>لا توجد متغيرات</td></tr>"
+        }
+      </tbody>
+    </table>
 
-      <h4 id="toggleImagesTitle" style="color:var(--blue); margin-top:15px; cursor:pointer; text-decoration:underline;">🖼️ إدارة الصور</h4>
-<div id="imageSection" style="display:none;">
-  <div id="imageManager" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"></div>
-  <input type="file" id="newImages" multiple accept="image/*" style="display:none;">
-</div>
+    <h4 id="toggleImagesTitle" style="color:var(--blue); margin-top:15px; cursor:pointer; text-decoration:underline;">🖼️ إدارة الصور</h4>
+    <div id="imageSection" style="display:none;">
+      <div id="imageManager" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;"></div>
+      <input type="file" id="newImages" multiple accept="image/*" style="display:none;">
+    </div>
 
-<input type="file" id="newImages" multiple accept="image/*" style="display:none;">
+    <div class="edit-area">
+      <button class="edit-btn" id="editDescBtn">✏️ تعديل الوصف</button>
+      <button class="copy-btn" id="copyDescBtn">📋 نسخ الوصف</button>
+    </div>
 
+    <textarea id="descInput" placeholder="${product.desc || 'لا يوجد وصف'}" disabled></textarea>
+    <button class="save-btn" id="saveBtn">💾 حفظ التعديلات</button>
+    <div class="loader" id="loader">⏳ جاري الحفظ...</div>
+  `;
 
-      <div class="edit-area">
-        <button class="edit-btn" id="editDescBtn">✏️ تعديل الوصف</button>
-        <button class="copy-btn" id="copyDescBtn">📋 نسخ الوصف</button>
-      </div>
-
-      <textarea id="descInput" placeholder="${product.desc || 'لا يوجد وصف'}" disabled></textarea>
-      <button class="save-btn" id="saveBtn">💾 حفظ التعديلات</button>
-      <div class="loader" id="loader">⏳ جاري الحفظ...</div>
-    `;
-
-// ✅ إعداد السلايدر النهائي (إصلاح العرض والحركة)
-// ✅ إعداد السلايدر النهائي (إصلاح العرض والحركة)
-let index = 0;
-const slider = document.getElementById("slider");
-const slides = Array.from(slider.querySelectorAll("img"));
-
-if (slides.length > 0) {
-  // 🔸 اجعل عرض السلايدر يساوي عدد الصور × 100%
-  slider.style.display = "flex";
-  slider.style.width = `${slides.length * 100}%`;
-  slider.style.transition = "transform 0.5s ease-in-out";
-  slider.style.transform = "translateX(0%)";
-
-  // 🔸 كل صورة تأخذ جزءها من العرض
-  slides.forEach(img => {
-    img.style.flex = "0 0 calc(100% / " + slides.length + ")";
-    img.style.width = "100%";
-    img.style.height = "260px";
-    img.style.objectFit = "contain";
-  });
-}
-
-function updateSlider() {
-  const offset = (index * 100) / slides.length;
-  slider.style.transform = `translateX(-${offset}%)`;
-  console.log("🔁 الوضع الحالي:", slider.style.transform);
-}
+  detailsContent.innerHTML = contentHTML;
+  // ✅ إضافة زر تحميل الصور في زاوية الصفحة
+const downloadIcon = document.createElement("button");
+downloadIcon.className = "download-icon";
+downloadIcon.innerHTML = "⬇️";
+downloadIcon.title = "تحميل جميع الصور";
+detailsContent.appendChild(downloadIcon);
 
 
-// ✅ دوال التالي والسابق
-function nextSlide() {
-  index = (index + 1) % slides.length;
-  updateSlider();
-}
+  // ✅ بعد كتابة المحتوى، أنشئ السلايدر الآن (ما راح يختفي بعدين)
+  if (imgArray.length > 0) {
+    const slider = document.createElement("div");
+    slider.className = "slider";
+    slider.style.display = "flex";
+    slider.style.overflowX = "auto";
+    slider.style.scrollSnapType = "x mandatory";
+    slider.style.gap = "10px";
+    slider.style.padding = "10px 0";
+    slider.style.marginBottom = "10px";
+    slider.style.scrollbarWidth = "none";
 
-function prevSlide() {
-  index = (index - 1 + slides.length) % slides.length;
-  updateSlider();
-}
-
-window.nextSlide = nextSlide;
-window.prevSlide = prevSlide;
-
-// ✅ بعد تحميل الصور فعليًا
-Promise.all(slides.map(img => new Promise(r => img.onload = r))).then(() => {
-  updateSlider();
-  console.log("📸 عدد الصور:", slides.length);
-  console.log("🧠 عرض السلايدر:", slider.offsetWidth, "px");
-  slides.forEach((img, i) =>
-    console.log(`🖼️ الصورة ${i + 1} عرضها:`, img.offsetWidth, "px")
-  );
+    imgArray.forEach(url => {
+  const img = document.createElement("img");
+  img.src = url;
+  img.style.flex = "0 0 100%"; // ✅ كل صورة تأخذ عرض الشاشة بالكامل
+  img.style.height = "280px";
+  img.style.objectFit = "contain";
+  img.style.borderRadius = "12px";
+  img.style.scrollSnapAlign = "center";
+  slider.appendChild(img);
 });
 
 
+    detailsContent.insertBefore(slider, detailsContent.firstChild);
+  }
 
+  // ✅ الآن كل العناصر موجودة في DOM فعليًا، نقدر نحصلها ونتعامل وياها
+  const newImages = document.getElementById("newImages");
+  const descInput = document.getElementById("descInput");
+  const editDescBtn = document.getElementById("editDescBtn");
+  const copyDescBtn = document.getElementById("copyDescBtn");
+  const saveBtn = document.getElementById("saveBtn");
+  const loader = document.getElementById("loader");
+  const imageManager = document.getElementById("imageManager");
+  const imageSection = document.getElementById("imageSection");
+  const toggleImagesTitle = document.getElementById("toggleImagesTitle");
 
+  // ✅ إدارة الصور الصغيرة
+  toggleImagesTitle.onclick = () => {
+    imageSection.style.display = imageSection.style.display === "none" ? "block" : "none";
+  };
 
-    // ✅ الأزرار الداخلية
-    const newImages = document.getElementById("newImages");
-    const descInput = document.getElementById("descInput");
-    const editDescBtn = document.getElementById("editDescBtn");
-    const copyDescBtn = document.getElementById("copyDescBtn");
-    const saveBtn = document.getElementById("saveBtn");
-    const loader = document.getElementById("loader");
-    const downloadIcon = document.getElementById("downloadIcon");
-// ✅ إدارة الصور في شبكة صغيرة أسفل التفاصيل
-const imageManager = document.getElementById("imageManager");
-const imageSection = document.getElementById("imageSection");
-const toggleImagesTitle = document.getElementById("toggleImagesTitle");
-
-// عند الضغط على العنوان، يبدّل إظهار أو إخفاء قسم الصور
-toggleImagesTitle.onclick = () => {
-  imageSection.style.display = imageSection.style.display === "none" ? "block" : "none";
-};
-
-
-// دالة لعرض الصور الحالية في مربعات صغيرة
-function renderImageManager(imgs = []) {
-  imageManager.innerHTML = "";
-
-  imgs.forEach((url, i) => {
-    const box = document.createElement("div");
-    box.style = `
-      width:70px;height:70px;position:relative;
-      border-radius:10px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.2);
-    `;
-    const img = document.createElement("img");
-    img.src = url;
-    img.style = "width:100%;height:100%;object-fit:cover;";
-
-    const del = document.createElement("div");
-    del.innerHTML = "❌";
-    del.style = `
-      position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.6);
-      color:white;width:20px;height:20px;border-radius:50%;
-      font-size:13px;text-align:center;line-height:20px;cursor:pointer;
-    `;
-    del.onclick = async () => {
-      if (confirm("هل تريد حذف هذه الصورة؟")) {
-const safeName = name.replace(/[.#$/[\]]/g, "_");
-const productRef = ref(db, "warehouse/" + safeName);
-        const snapshot = await get(productRef);
-        if (!snapshot.exists()) return;
-        const old = snapshot.val();
-        const newImgs = (old.images || []).filter(img => img !== url);
-        await update(productRef, { images: newImgs });
-        renderImageManager(newImgs);
-        alert("🗑️ تم حذف الصورة بنجاح!");
-      }
-    };
-
-    box.appendChild(img);
-    box.appendChild(del);
-    imageManager.appendChild(box);
-  });
-
-  // مربع لإضافة صور جديدة
-  const addBox = document.createElement("div");
-  addBox.innerHTML = "➕";
-  addBox.style = `
-    width:70px;height:70px;display:flex;align-items:center;justify-content:center;
-    border:2px dashed var(--orange);color:var(--orange);
-    font-size:22px;border-radius:10px;cursor:pointer;
-  `;
-  addBox.onclick = () => newImages.click();
-
-  imageManager.appendChild(addBox);
-}
-
-// أول عرض للصور عند فتح التفاصيل
-renderImageManager(product.images || []);
-
-    // تعديل الوصف
-    editDescBtn.onclick = () => {
-      descInput.disabled = false;
-      descInput.focus();
-      saveBtn.style.display = "block";
-    };
-
-    // ✅ زر النسخ يشتغل فعليًا الآن
-    copyDescBtn.onclick = () => {
-      const text = descInput.value || descInput.placeholder || "";
-      navigator.clipboard.writeText(text)
-        .then(() => alert("📋 تم نسخ الوصف بنجاح!"))
-        .catch(() => alert("❌ فشل النسخ"));
-    };
-
-    newImages.addEventListener("change", () => {
-      if (newImages.files.length > 0) saveBtn.style.display = "block";
-    });
-    descInput.addEventListener("input", () => saveBtn.style.display = "block");
-
-    // ✅ تحميل كل الصور كملف مضغوط
-    downloadIcon.onclick = async () => {
-      const urls = product.images || [];
-      if (urls.length === 0) {
-        alert("🚫 لا توجد صور لتحميلها");
-        return;
-      }
-
-      for (let i = 0; i < urls.length; i++) {
-        try {
-          const response = await fetch(urls[i]);
-          const blob = await response.blob();
-          const a = document.createElement("a");
-          a.href = URL.createObjectURL(blob);
-          a.download = `${name}_${i + 1}.jpg`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-        } catch (err) {
-          console.error("❌ خطأ أثناء تحميل الصورة:", err);
+  function renderImageManager(imgs = []) {
+    imageManager.innerHTML = "";
+    imgs.forEach((url, i) => {
+      const box = document.createElement("div");
+      box.style = `
+        width:70px;height:70px;position:relative;
+        border-radius:10px;overflow:hidden;box-shadow:0 2px 6px rgba(0,0,0,0.2);
+      `;
+      const img = document.createElement("img");
+      img.src = url;
+      img.style = "width:100%;height:100%;object-fit:cover;";
+      const del = document.createElement("div");
+      del.innerHTML = "❌";
+      del.style = `
+        position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.6);
+        color:white;width:20px;height:20px;border-radius:50%;
+        font-size:13px;text-align:center;line-height:20px;cursor:pointer;
+      `;
+      del.onclick = async () => {
+        if (confirm("هل تريد حذف هذه الصورة؟")) {
+          const safeName = name.replace(/[.#$/[\]]/g, "_");
+          const productRef = ref(db, "warehouse/" + safeName);
+          const snapshot = await get(productRef);
+          if (!snapshot.exists()) return;
+          const old = snapshot.val();
+          const newImgs = (old.images || []).filter(img => img !== url);
+          await update(productRef, { images: newImgs });
+          renderImageManager(newImgs);
+          alert("🗑️ تم حذف الصورة بنجاح!");
         }
+      };
+      box.appendChild(img);
+      box.appendChild(del);
+      imageManager.appendChild(box);
+    });
+
+    // زر الإضافة
+    const addBox = document.createElement("div");
+    addBox.innerHTML = "➕";
+    addBox.style = `
+      width:70px;height:70px;display:flex;align-items:center;justify-content:center;
+      border:2px dashed var(--orange);color:var(--orange);
+      font-size:22px;border-radius:10px;cursor:pointer;
+    `;
+    addBox.onclick = () => newImages.click();
+    imageManager.appendChild(addBox);
+  }
+
+  renderImageManager(product.images || []);
+
+  // ✅ تعديل الوصف
+  editDescBtn.onclick = () => {
+    descInput.disabled = false;
+    descInput.focus();
+    saveBtn.style.display = "block";
+  };
+
+  // ✅ نسخ الوصف
+  copyDescBtn.onclick = () => {
+    const text = descInput.value || descInput.placeholder || "";
+    navigator.clipboard.writeText(text)
+      .then(() => alert("📋 تم نسخ الوصف بنجاح!"))
+      .catch(() => alert("❌ فشل النسخ"));
+  };
+
+  // ✅ إظهار زر الحفظ
+  newImages.addEventListener("change", () => {
+    if (newImages.files.length > 0) saveBtn.style.display = "block";
+  });
+  descInput.addEventListener("input", () => saveBtn.style.display = "block");
+
+  // ✅ حفظ التعديلات (الوصف + الصور)
+  saveBtn.onclick = async () => {
+    loader.style.display = "block";
+    saveBtn.disabled = true;
+
+    const newFiles = newImages.files;
+    const newDesc = descInput.value.trim();
+    const urls = [];
+
+    try {
+      for (const file of newFiles) {
+        const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2)}_${file.name}`;
+        const safeName = name.replace(/[^\w\s]/gi, "_");
+        const storageRef = sRef(storage, `warehouse_images/${safeName}/${uniqueName}`);
+        await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(storageRef);
+        urls.push(url);
       }
-      alert("✅ تم تحميل جميع الصور بنجاح!");
-    };
 
-   // ✅ رفع الصور الجديدة وتحديث قاعدة البيانات
-saveBtn.onclick = async () => {
-  loader.style.display = "block";
-  saveBtn.disabled = true;
+      const safeName = name.replace(/[.#$/[\]]/g, "_");
+      const productRef = ref(db, "warehouse/" + safeName);
+      const snapshot = await get(productRef);
+      const old = snapshot.exists() ? snapshot.val() : {};
 
-  const newFiles = newImages.files;
-  const newDesc = descInput.value.trim();
-  const urls = [];
+      const oldImgs = Array.isArray(old.images)
+        ? old.images
+        : Object.values(old.images || {});
+      const updatedImages = [...oldImgs, ...urls];
 
-  try {
-    // رفع الصور الجديدة
-    for (const file of newFiles) {
-      const uniqueName = `${Date.now()}_${Math.random().toString(36).substring(2)}_${file.name}`;
-const safeName = name.replace(/[^\w\s]/gi, "_");
-const storageRef = sRef(storage, `warehouse_images/${safeName}/${uniqueName}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      urls.push(url);
+      await update(productRef, {
+        desc: newDesc || old.desc || "",
+        images: updatedImages,
+        lastUpdate: new Date().toISOString(),
+      });
+
+      renderImageManager(updatedImages);
+      descInput.disabled = true;
+      loader.style.display = "none";
+      saveBtn.style.display = "none";
+      alert("✅ تم حفظ التعديلات بنجاح!");
+    } catch (e) {
+      console.error(e);
+      alert("❌ حدث خطأ أثناء حفظ البيانات!");
+      loader.style.display = "none";
+     } finally {
+      saveBtn.disabled = false;
+    }
+  };
+
+  // ✅ عند الضغط على زر التحميل، نزّل جميع صور المنتج
+  downloadIcon.onclick = async () => {
+    const urls = product.images || [];
+    if (!urls.length) {
+      alert("🚫 لا توجد صور لتحميلها");
+      return;
     }
 
-const safeName = name.replace(/[.#$/[\]]/g, "_");
-const productRef = ref(db, "warehouse/" + safeName);
-    const snapshot = await get(productRef);
-    const old = snapshot.exists() ? snapshot.val() : {};
+    for (let i = 0; i < urls.length; i++) {
+      try {
+        const response = await fetch(urls[i]);
+        const blob = await response.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${name}_${i + 1}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (err) {
+        console.error("❌ خطأ أثناء تحميل الصورة:", err);
+      }
+    }
 
-    const oldImgs = Array.isArray(old.images) ? old.images : Object.values(old.images || {});
-    const updatedImages = [...oldImgs, ...urls];
+    alert("✅ تم تحميل جميع الصور بنجاح!");
+  };
+}
 
-    // تحديث الوصف والصور فقط بدون حذف البيانات القديمة
-    await update(productRef, {
-  desc: newDesc || old.desc || "",
-  images: updatedImages,
-  lastUpdate: new Date().toISOString()
-});
-
-
-    renderImageManager(updatedImages); // تحديث واجهة الصور فورًا
-    descInput.disabled = true;
-    loader.style.display = "none";
-    saveBtn.style.display = "none";
-    alert("✅ تم حفظ الصور بنجاح!");
-  } catch (e) {
-    console.error(e);
-    alert("❌ حدث خطأ أثناء رفع الصور!");
-    loader.style.display = "none";
-  } finally {
-    saveBtn.disabled = false;
-  }
-};
-
-  }; // ← نهاية showDetails
 
   // ✅ الرجوع للشاشة الرئيسية
   window.showGrid = () => {
