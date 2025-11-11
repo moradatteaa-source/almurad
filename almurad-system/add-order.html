@@ -816,7 +816,6 @@ const order = {
   status: document.querySelector("#status input")?.value || "",
   advertiser: document.getElementById("advertiser").value.trim(),
   orderDate: new Date().toISOString(),
-  fixedBy: loggedUser?.username || "غير محدد",
   extraProducts: extraProducts,
   productsDetailed: productsDetailed // ✅ هذا هو السطر الجديد المهم
 };

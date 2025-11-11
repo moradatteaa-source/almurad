@@ -607,87 +607,44 @@ let previousOrderCount = 0;
 
 // 🟢 مراقبة الطلبات الجديدة + تحديث الجدول معاً
 const ordersRef = ref(db, "orders");
-// ✅ مراقبة جميع الطلبات وإضافة fixedBy و fixedAt تلقائياً حسب المصدر
-onValue(ordersRef, async (snapshot) => {
-  if (!snapshot.exists()) return;
-  const data = snapshot.val();
-  const updates = {};
 
-  Object.entries(data).forEach(([id, order]) => {
-    const status = (order.status || "").trim();
-
-    // نتحقق فقط من الحالات "مثبت" أو "رفض"
-    if ((status === "مثبت" || status === "رفض") && !order.fixedBy) {
-      let sourceLabel = "نظام تلقائي";
-
-      // 🧠 نحاول نحدد مصدر الطلب (استمارة تيك توك أو شيت أو واجهة)
-      if (order.source && order.source.toLowerCase().includes("tiktok")) {
-        sourceLabel = "تيك توك";
-      } else if (order.source && order.source.toLowerCase().includes("sheet")) {
-        sourceLabel = "شيت";
-      } else if (order.createdBy) {
-        sourceLabel = order.createdBy; // إذا كان بي اسم الموظف من البداية
-      } else {
-        sourceLabel =
-          sessionStorage.getItem("userName") ||
-          localStorage.getItem("userName") ||
-          "نظام تلقائي";
-      }
-
-      // نجهز التحديثات
-      updates[`orders/${id}/fixedBy`] = sourceLabel;
-      updates[`orders/${id}/fixedAt`] = new Date().toISOString();
-    }
-  });
-
-  // 💾 تنفيذ التحديثات كلها مرة وحدة لو أكو شي ناقص
-  if (Object.keys(updates).length > 0) {
-    const db = getDatabase();
-    await update(ref(db), updates);
-    console.log("🧩 تم تصحيح fixedBy و fixedAt تلقائياً للطلبات المثبتة أو المرفوضة");
-  }
-});
-
+// ✅ مراقبة الطلبات فقط بدون أي تعديل على fixedBy
 onValue(ordersRef, (snapshot) => {
   if (!snapshot.exists()) {
     ordersBody.innerHTML = `<tr><td colspan="17">🚫 لا توجد طلبات</td></tr>`;
     return;
   }
 
-  // 🔹 تحويل البيانات إلى مصفوفة
   const data = snapshot.val();
-  allOrders = Object.entries(data).map(([id, order]) => ({ id, ...order }));
+
+// 🔹 تحويل البيانات إلى مصفوفة فقط (بدون أي تعديل)
+allOrders = Object.entries(data).map(([id, order]) => ({ id, ...order }));
+
+// ✅ نعرض الطلبات الجديدة فقط إذا الصفحة مخصصة للطلبات الجديدة
+if (!currentStatus) {
+  const newOrders = allOrders.filter(o => {
+    const st = (o.status || "").trim();
+    return !st || st === "غير محدد" || st === null;
+  });
+  currentOrders = newOrders;
+  currentIndex = 0;
+  ordersBody.innerHTML = ""; // 🧹 تنظيف الجدول قبل الرسم
+  renderNextOrders(); // عرض أول 50 فقط
+} else {
+  // ✅ غير الطلبات الجديدة (مثلاً مثبتة أو قيد التوصيل)
   refreshVisibleOrders();
-
-  // ✅ إذا كانت الحالة فارغة (طلبات جديدة)
-  if (!currentStatus) {
-    const newOrders = allOrders.filter(o => {
-      const st = (o.status || "").trim();
-      return !st || st === "غير محدد" || st === null;
-    });
-    currentOrders = newOrders;
-    currentIndex = 0;
-    renderNextOrders(); // عرض أول 50
-  }
-
-
- // 🔹 مقارنة العدد لمعرفة إذا أكو طلب جديد
-const currentCount = Object.keys(data).length;
-
-// ✅ هذا الإشعار الآن يشتغل في كل الصفحات (بغض النظر عن الحالة)
-if (previousOrderCount && currentCount > previousOrderCount) {
-  const diff = currentCount - previousOrderCount;
-  showNewOrderNotification(diff);
 }
 
-// ✅ نحدث العدد حتى لا يعيد الإشعار
-previousOrderCount = currentCount;
 
-
+  // ✅ إشعار عند وجود طلب جديد
+  const currentCount = Object.keys(data).length;
+  if (previousOrderCount && currentCount > previousOrderCount) {
+    const diff = currentCount - previousOrderCount;
+    showNewOrderNotification(diff);
+  }
   previousOrderCount = currentCount;
-
-
 });
+
 
 
 // ✅ متغيرات العرض الجزئي
@@ -1080,7 +1037,8 @@ input.addEventListener("input", e => {
       tr.appendChild(td);
     });
 
-    ordersBody.appendChild(tr);
+    ordersBody.prepend(tr);
+
     return; // ⛔ نوقف هنا، ما نكمل باقي الكود الخاص بالتحرير
   }
 
@@ -1156,8 +1114,16 @@ const fields = [
   {
     name: "status",
     val: order.status || "",
-  dropdown: ["مثبت", "بانتظار البضاعة", "قيد المعالجة", "رفض"],fn: async (newStatus) => {
-  console.log("🧠 تم تغيير الحالة:", newStatus);
+dropdown: ["مثبت", "بانتظار البضاعة", "قيد المعالجة", "رفض"],
+fn: async (newStatus) => {
+  console.log("🧠 محاولة تغيير الحالة إلى:", newStatus);
+
+  // ✅ حماية إضافية: لا تسوي أي شيء إذا الحالة الجديدة فارغة أو غير صالحة
+  if (!newStatus || newStatus.trim() === "" || newStatus.trim() === "غير محدد") {
+    console.warn("⚠️ تجاهل التحديث لأن الحالة فارغة أو غير صالحة");
+    return;
+  }
+
   const userName = currentUser;
   const orderRef = ref(db, `orders/${order.id}`);
   const snap = await get(orderRef);
@@ -1173,7 +1139,9 @@ const fields = [
   };
 
   // ✅ فقط أول من يثبت أو يرفض الطلب هو اللي يُسجل باسمه
-  if ((newStatus === "مثبت" || newStatus === "رفض") && !existing.fixedBy) {
+ const s = (existing.status || "").trim();
+if ((newStatus === "مثبت" || newStatus === "رفض") && !existing.fixedBy)
+{
     updates.fixedBy =
       existing.fixedBy ||
       sessionStorage.getItem("userName") ||
@@ -1200,6 +1168,7 @@ const fields = [
     (currentStatus !== "" && st !== currentStatus);
   if (shouldHide) tr.remove();
 }
+
 
   },
   { name: "orderDate", val: order.orderDate || "-", readonly: true },
@@ -1282,7 +1251,8 @@ else {
 });
 
 
-        ordersBody.appendChild(tr);
+       ordersBody.prepend(tr);
+
       });
     }
 
@@ -1850,6 +1820,10 @@ function showNewOrderNotification(count = 1) {
     }`;
   document.head.appendChild(style);
 }
+// ❌ لا تشتغل إشعارات الطلبات داخل صفحة الطلبات نفسها
+if (window.location.pathname.includes("orders.html")) {
+  console.log("⏸️ تعطيل إشعارات الطلبات داخل صفحة الطلبات لتجنب التكرار");
+} else {
 
 // ✅ مراقبة الطلبات الجديدة من الفايربيس
 import("https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js").then(async ({ initializeApp }) => {
@@ -1865,19 +1839,23 @@ import("https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js").then(async 
   });
 
   const db = getDatabase(app);
-  const ordersRef = ref(db, "orders");
+const ordersCountRef = ref(db, "orders");
   let previousCount = 0;
 
-  onValue(ordersRef, (snapshot) => {
-    if (!snapshot.exists()) return;
-    const data = snapshot.val();
-    const count = Object.keys(data).length;
-    if (previousCount && count > previousCount) {
-      const diff = count - previousCount;
-      showNewOrderNotification(diff);
-    }
-    previousCount = count;
-  });
+  // ✅ مراقبة فقط عدد الطلبات بدون التأثير على واجهة العرض
+onValue(ordersCountRef, (snapshot) => {
+  if (!snapshot.exists()) return;
+  const newCount = Object.keys(snapshot.val()).length;
+
+  // نتحقق فقط من الفرق العددي (ما نلمس الطلبات)
+  if (previousCount && newCount > previousCount) {
+    const diff = newCount - previousCount;
+    showNewOrderNotification(diff);
+  }
+
+  previousCount = newCount;
+}, { onlyOnce: false });
+
 });
 
 // ✅ تفعيل إذن الصوت بدون تشغيل ملف
@@ -1913,9 +1891,9 @@ window.showNotification = function (message, color = "#043B64") {
     setTimeout(() => note.remove(), 400);
   }, 3000);
 };
+}
 
 </script>
 
 </body>
 </html>
-
