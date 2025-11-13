@@ -791,20 +791,20 @@ function createEditableInput(value, onSave, fieldName = "", orderId = "") {
   const input = document.createElement("input");
   input.value = value || "";
 
-  // 🧠 نخلي الفاصلة فقط لو الحقل اسمه السعر أو العدد
-  if (fieldName === "price" || fieldName === "quantity") {
-    input.addEventListener("input", e => {
-      let val = e.target.value.replace(/[^\d]/g, "");
-      if (val) {
-        e.target.value = new Intl.NumberFormat("en-US").format(val);
-      }
-    });
-    input.addEventListener("change", e => {
-      const cleanValue = e.target.value.replace(/,/g, "");
-      recordChange(orderId, fieldName, value, cleanValue); // ✅ نسجل التغيير
-      onSave(cleanValue);
-    });
-  } else {
+ if (fieldName === "price" || fieldName === "quantity") {
+  input.addEventListener("input", e => {
+    // فقط أرقام — بدون فوارز، بدون تنسيق
+    e.target.value = e.target.value.replace(/[^\d]/g, "");
+  });
+
+  input.addEventListener("change", e => {
+    const cleanValue = e.target.value.replace(/[^\d]/g, "");
+    recordChange(orderId, fieldName, value, cleanValue);
+    onSave(cleanValue);
+  });
+}
+
+   else {
     // 🟠 باقي الحقول بدون أي فاصلة
     input.addEventListener("change", e => {
       const newVal = e.target.value;
