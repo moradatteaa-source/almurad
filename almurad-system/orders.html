@@ -347,6 +347,9 @@ td:nth-child(2), th:nth-child(2) {
   </div>
   <button class="delete-btn" id="deleteSelected">🗑 حذف المحددة</button>
 </div>
+<button class="delete-btn" id="deleteDuplicates" style="margin-right:10px;background:#8b0000;">
+  🗑 مسح التكرارات
+</button>
 
 
   <div class="search-bar">
@@ -1426,12 +1429,58 @@ renderOrdersPaginated(allOrders);
 
     // 🗑 حذف المحددة
     document.getElementById("deleteSelected").addEventListener("click", () => {
+    
       const checked = Array.from(document.querySelectorAll("input[type='checkbox']:checked"));
       if (checked.length === 0) return alert("لم يتم تحديد أي طلبات!");
       if (!confirm("هل أنت متأكد من حذف الطلبات المحددة؟")) return;
       checked.forEach(ch => remove(ref(db, `orders/${ch.dataset.id}`)));
       alert("✅ تم حذف الطلبات المحددة بنجاح");
     });
+document.getElementById("deleteDuplicates").addEventListener("click", async () => {
+
+  if (!confirm("⚠️ هل أنت متأكد من حذف جميع التكرارات حسب رقم الهاتف؟")) return;
+
+  const ordersRef = ref(db, "orders");
+  const snap = await get(ordersRef);
+
+  if (!snap.exists()) {
+    alert("🚫 لا توجد طلبات.");
+    return;
+  }
+
+  const data = snap.val();
+  const seen = {};     
+  const duplicates = [];  
+
+  for (const [id, order] of Object.entries(data)) {
+
+    const phone = (order.phone1 || order.phone || "").trim();
+    const status = (order.status || "").trim();
+
+    // فقط الطلبات الجديدة
+    const isNew = !status || status === "" || status === "غير محدد";
+    if (!isNew || !phone) continue;
+
+    if (!seen[phone]) {
+      seen[phone] = id;   // أول طلب
+    } else {
+      duplicates.push(id); // نسخة مكررة
+    }
+  }
+
+  // 🔥 مسح التكرارات دفعة واحدة (أسرع وبدون lag)
+  const updates = {};
+  duplicates.forEach(id => {
+    updates[`orders/${id}`] = null;
+  });
+
+  await update(ref(db), updates);
+
+  alert(`🗑 تم حذف ${duplicates.length} طلب مكرر بالكامل.`);
+});
+
+
+
 
     document.getElementById("backBtn").addEventListener("click", () => window.location.href = "dashboard.html");
 

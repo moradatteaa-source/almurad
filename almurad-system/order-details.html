@@ -393,6 +393,10 @@ input, textarea {
   opacity: 0.9;
   transform: scale(1.05);
 }
+input, select, textarea {
+  font-size: 16px !important;
+  touch-action: manipulation !important;
+}
 
   </style>
 </head>
@@ -591,87 +595,8 @@ window.orderId = localStorage.getItem("selectedOrder");
       wrapper.appendChild(dropdown);
       return wrapper;
     }
-// ✅ تحميل المتغيرات الديناميكية للمنتج
-async function loadVariants(productName) {
-  const variantsContainer = document.getElementById("variantsContainer");
-  variantsContainer.innerHTML = ""; // تنظيف الحاوية أولاً
-
-  const snap = await get(ref(db, "warehouse"));
-  if (!snap.exists()) return;
-
-  const allProducts = snap.val();
-  const productData = allProducts[productName];
-  if (!productData || !productData.stock) return;
-
-  const stock = productData.stock;
-  const activeKeys = Object.keys(stock).filter(k => k !== "إجمالي الكمية" && stock[k] > 0);
-  if (activeKeys.length === 0) return;
-
-  // 🧩 استخراج كل أنواع المتغيرات (اللون، القياس، الخ)
-  const variantsMap = {};
-  activeKeys.forEach(key => {
-    const parts = key.split("|").map(s => s.trim());
-    for (let i = 0; i < parts.length; i += 2) {
-      const name = parts[i];
-      const val = parts[i + 1];
-      if (!variantsMap[name]) variantsMap[name] = new Set();
-      variantsMap[name].add(val);
-    }
-  });
-
-  const selected = {};
-
-  // 🔹 توليد المنسدلات تباعاً حسب الاختيارات
-  const variantNames = Object.keys(variantsMap);
-  if (variantNames.length === 0) return;
-
-  function renderDropdown(level = 0) {
-  // 🔹 حذف جميع المنسدلات بعد هذا المستوى لتحديثها من جديد
-const oldNext = Array.from(variantsContainer.querySelectorAll(".variant-group"));
-oldNext.forEach((el, idx) => {
-  if (idx >= level) el.remove();
-});
 
 
-    const name = variantNames[level];
-    if (!name) return;
-
-    // فلترة القيم بناءً على المتغيرات السابقة
-    const filteredKeys = activeKeys.filter(key =>
-      Object.entries(selected).every(([k, v]) => key.includes(`${k} | ${v}`))
-    );
-
-    const availableVals = new Set();
-    filteredKeys.forEach(key => {
-      const parts = key.split("|").map(s => s.trim());
-      for (let i = 0; i < parts.length; i += 2) {
-        const k = parts[i], val = parts[i + 1];
-        if (k === name) availableVals.add(val);
-      }
-    });
-
-    if (availableVals.size === 0) return;
-
-    const wrapper = document.createElement("div");
-    wrapper.className = "variant-group field single";
-    const label = document.createElement("label");
-    label.textContent = `${name}:`;
-    label.style.color = "#043B64";
-    label.style.fontWeight = "600";
-    label.style.marginTop = "8px";
-    wrapper.appendChild(label);
-
-    const dropdown = createDropdown([...availableVals], selected[name] || "", val => {
-      selected[name] = val;
-      update(ref(db, `orders/${orderId}/selectedVariants`), selected);
-      renderDropdown(level + 1); // توليد التالي
-    });
-    wrapper.appendChild(dropdown);
-    variantsContainer.appendChild(wrapper);
-  }
-
-  renderDropdown(0);
-}
 
 // ✅ تحميل المتغيرات الديناميكية للمنتج الإضافي مع الاعتماد على المتغير الأول
 async function loadVariantsForExtra(container, productName, productObj) {
@@ -918,6 +843,84 @@ waBtn.setAttribute("rel", "noopener noreferrer");
       const areas = citiesData[data.city] || [];
       const areaDropdown = createDropdown(areas, data.area || "", val => update(ref(db, `orders/${orderId}`), { area: val }));
       areaDiv.appendChild(areaDropdown);
+async function loadVariants(productName) {
+  const variantsContainer = document.getElementById("variantsContainer");
+  variantsContainer.innerHTML = "";
+
+  const snap = await get(ref(db, "warehouse"));
+  if (!snap.exists()) return;
+
+  const allProducts = snap.val();
+  const productData = allProducts[productName];
+  if (!productData || !productData.stock) return;
+
+  const stock = productData.stock;
+  const activeKeys = Object.keys(stock).filter(k => k !== "إجمالي الكمية" && stock[k] > 0);
+  if (activeKeys.length === 0) return;
+
+  const savedVariantsSnap = await get(ref(db, `orders/${orderId}/selectedVariants`));
+  const savedVariants = savedVariantsSnap.exists() ? savedVariantsSnap.val() : {};
+
+  const variantsMap = {};
+  activeKeys.forEach(key => {
+    const parts = key.split("|").map(s => s.trim());
+    for (let i = 0; i < parts.length; i += 2) {
+      const name = parts[i];
+      const val = parts[i + 1];
+      if (!variantsMap[name]) variantsMap[name] = new Set();
+      variantsMap[name].add(val);
+    }
+  });
+
+  const variantNames = Object.keys(variantsMap);
+  let selected = { ...savedVariants };
+
+  function renderDropdown(level = 0) {
+    Array.from(variantsContainer.querySelectorAll(".variant-group"))
+      .slice(level)
+      .forEach(el => el.remove());
+
+    const name = variantNames[level];
+    if (!name) return;
+
+    const filteredKeys = activeKeys.filter(key =>
+      Object.entries(selected).every(([k, v]) => key.includes(`${k} | ${v}`))
+    );
+
+    const availableVals = new Set();
+    filteredKeys.forEach(key => {
+      const parts = key.split("|").map(s => s.trim());
+      for (let i = 0; i < parts.length; i += 2) {
+        const k = parts[i], val = parts[i + 1];
+        if (k === name) availableVals.add(val);
+      }
+    });
+
+    if (availableVals.size === 0) return;
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "variant-group field single";
+
+    const label = document.createElement("label");
+    label.textContent = `${name}:`;
+    wrapper.appendChild(label);
+
+    const dropdown = createDropdown(
+      [...availableVals],
+      selected[name] || "",
+      val => {
+        selected[name] = val;
+        update(ref(db, `orders/${orderId}/selectedVariants`), selected);
+        renderDropdown(level + 1);
+      }
+    );
+
+    wrapper.appendChild(dropdown);
+    variantsContainer.appendChild(wrapper);
+  }
+
+  renderDropdown(0);
+}
 
       // المنتج الرئيسي
       const productDiv = document.getElementById("product");
