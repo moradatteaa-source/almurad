@@ -275,15 +275,16 @@ thead th {
   color: white;
   z-index: 40;
 }
-/* 🔵 حاوية الجدول */
+/* 🔵 حاوية الجدول — بعد الإصلاح */
 .table-container {
   position: relative;
   width: 100%;
   overflow: auto;
   background: white;
   border-radius: 10px;
-  touch-action: pan-x pinch-zoom;
+  touch-action: pan-x pan-y pinch-zoom !important;
 }
+
 
 /* 🟠 الجدول نفسه يبقى ثابت يمين وفوك عند التكبير */
 .table-container table {
@@ -2017,10 +2018,10 @@ const maxZoom = 2.5;
 const minZoom = 0.2;
 
 function applyZoom() {
-tableContainer.style.transform = `scale(${zoomLevel})`;
-tableContainer.style.transformOrigin = "top right";
-            // 👈 يمنع تحريك الجدول لليسار
+  table.style.transform = `scale(${zoomLevel})`;
+  table.style.transformOrigin = "top right";
 }
+
 
 
 // 🔍 تكبير
