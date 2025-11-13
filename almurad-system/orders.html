@@ -5,63 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=10.0, minimum-scale=0.2, user-scalable=yes">
   <title>الطلبات - نظام المراد</title>
   <style>
-
-/* ============================
-   🎯 نظام حركة الجدول النهائي
-   ============================ */
-
-/* الحاوية الرئيسية للجدول */
-.table-container {
-  width: 100%;
-  height: 80vh;
-
-  overflow-x: auto;   /* يتحرك يسار/يمين */
-  overflow-y: auto;   /* يتحرك فوق/تحت */
-
-  -webkit-overflow-scrolling: touch; /* سلاسة آيفون */
-  
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-
-  position: relative;
-
-  /* 👇 السماح بالسحب بكل الاتجاهات */
-  touch-action: pan-x pan-y;
-}
-
-/* الجدول نفسه */
-.table-container table {
-  min-width: 1400px;
-  width: max-content;
-  margin: 0;
-  transform-origin: top right;
-  transition: transform 0.15s ease-out;
-}
-
-/* 📌 تثبيت رأس الجدول */
-thead th {
-  position: sticky;
-  top: 0;
-  z-index: 50;
-  background: #043B64;
-  color: white;
-}
-
-/* 📌 تثبيت عمود الاختيار */
-td:first-child, th:first-child {
-  position: sticky;
-  right: 0;
-  background: white;
-  z-index: 40;
-}
-
-/* 📌 تثبيت عمود التسلسل (#) */
-td:nth-child(2), th:nth-child(2) {
-  position: sticky;
-  right: 60px;
-  background: white;
-  z-index: 39;
+html, body {
+  touch-action: auto !important; /* 🔥 السماح الكامل للـ pinch zoom */
+  -ms-touch-action: auto;
+  overflow: auto !important;
+  overscroll-behavior: contain;
 }
 
 
@@ -133,6 +81,18 @@ input, select, textarea, button {
 
 
 
+
+table {
+  width: max-content;
+  min-width: 100%;
+  transform-origin: 0 0;
+  touch-action: pan-x pan-y;
+}
+
+body {
+  transform-origin: 0 0;
+  touch-action: pan-x pan-y pinch-zoom !important; /* 🔥 يسمح بالسحب والتكبير الحر */
+}
 
 thead th {
   position: sticky;
@@ -249,7 +209,6 @@ input, select, textarea {
   }
 }
 
-
 /* 👇 هذا السطر يخلي الجدول يتعامل مع اللمس كأنه Google Sheets */
 table {
   width: max-content;
@@ -289,9 +248,23 @@ table {
   transform: scale(1.1);
 }
 
-
 .table-container table {
   margin: 0; /* ثابت بدون وسط */
+}
+/* ✅ تثبيت عمود الاختيار */
+td:first-child, th:first-child {
+  position: sticky;
+  left: 0;
+  background: white;
+  z-index: 30;
+}
+
+/* 🎯 تثبيت عمود التسلسل (#) يمين عمود الاختيار */
+td:nth-child(2), th:nth-child(2) {
+  position: sticky;
+  left: 60px;
+  background: white;
+  z-index: 29;
 }
 
 /* 🎯 تثبيت رأس الجدول (الصف العلوي) */
@@ -302,31 +275,15 @@ thead th {
   color: white;
   z-index: 40;
 }
-/* 🎯 حاوية الجدول — ثبات كامل وحركة سلسة */
+/* 🔵 حاوية الجدول */
 .table-container {
+  position: relative;
   width: 100%;
-    touch-action: pan-x pan-y !important;
-
-  height: 80vh;
-  overflow-x: auto;      /* تحريك يمين/يسار */
-  overflow-y: auto;      /* تحريك فوق/تحت */
-  -webkit-overflow-scrolling: touch; /* سلاسة آيفون */
+  overflow: auto;
   background: white;
   border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  position: relative;
-  touch-action: pan-y pan-x;   /* السماح بالتحريك كل الاتجاهات بدون هزة */
+  touch-action: pan-x pinch-zoom;
 }
-
-/* 🎯 الجدول نفسه */
-.table-container table {
-  margin: 0;
-  min-width: 1400px;
-  width: max-content;
-  transform-origin: top right !important; /* حتى يبقى ثابت يمين */
-  transition: transform 0.15s ease-out;
-}
-
 
 /* 🟠 الجدول نفسه يبقى ثابت يمين وفوك عند التكبير */
 .table-container table {
@@ -359,15 +316,6 @@ td:nth-child(2), th:nth-child(2) {
   background: white;
   z-index: 39;
 }
-/* 🎯 إصلاح السحب والتمرير النهائي */
-.table-container {
-  touch-action: pan-y !important;    /* يسمح بالنزول بسلاسة */
-  overflow-y: auto;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;  /* سرعة رهيبة على الآيفون */
-}
-
-
 
 
   </style>
