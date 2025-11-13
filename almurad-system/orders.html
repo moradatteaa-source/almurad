@@ -5,25 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=10.0, minimum-scale=0.2, user-scalable=yes">
   <title>الطلبات - نظام المراد</title>
   <style>
-html, body {
-  touch-action: auto !important; /* 🔥 السماح الكامل للـ pinch zoom */
-  -ms-touch-action: auto;
-  overflow: auto !important;
-  overscroll-behavior: contain;
-}
-/* ✅ ثبات الجدول أثناء الحركة */
-.table-container {
-  overflow-x: auto;      /* تمرير يمين/يسار فقط عند رغبة المستخدم */
-  overflow-y: auto;      /* تمرير فوق/تحت طبيعي */
-  touch-action: pan-y;   /* الموبايل يركز على النزول والصعود */
-  -webkit-overflow-scrolling: touch; /* سلاسة عالية للآيفون */
-  scroll-behavior: smooth;
-}
 
-/* منع الاهتزاز يمين/يسار أثناء السحب العمودي */
-.table-container:active {
-  touch-action: pan-y !important;
-}
+
 
 /* يمنع الجدول من الهروب لليسار */
 .table-container table {
@@ -90,14 +73,7 @@ input, select, textarea, button {
       border-radius: 6px;
       border: 1px solid #ccc;
     }
- .table-container {
-  width: 100%;
-  overflow: auto; /* ✅ يسمح بالتحريك بكل الاتجاهات */
-  -webkit-overflow-scrolling: touch; /* ✅ تمرير سلس بالموبايل */
-  white-space: nowrap;
-  padding: 10px;
-  max-height: none;
-}
+
 
 
 
@@ -109,9 +85,6 @@ table {
   touch-action: pan-x pan-y;
 }
 
-table {
-  touch-action: pan-x pan-y;
-}
 body {
   transform-origin: 0 0;
   touch-action: pan-x pan-y pinch-zoom !important; /* 🔥 يسمح بالسحب والتكبير الحر */
@@ -125,11 +98,7 @@ thead th {
   z-index: 10;
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
-/* ✅ ضمان أن الصف العلوي يظل دائم الظهور حتى عند كثرة الطلبات */
-.table-container {
-  overflow-y: auto;
-  max-height: 80vh; /* يخلي الجدول قابل للتمرير ويثبت الهيدر */
-}
+
 
 
     table {
@@ -236,16 +205,6 @@ input, select, textarea {
   }
 }
 
-.table-container {
-  width: 100%;
-  height: 100%;
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
-  white-space: nowrap;
-  padding: 10px;
-  max-height: none;
-  transform-origin: 0 0;
-}
 
 /* 👇 هذا السطر يخلي الجدول يتعامل مع اللمس كأنه Google Sheets */
 table {
@@ -285,38 +244,10 @@ table {
   opacity: 1;
   transform: scale(1.1);
 }
-/* 🧱 تحديد حدود الجدول داخل الصفحة حتى لا يخرج يمين أو أسفل */
-.table-container {
-  position: relative;
-  width: 100%;
-  max-width: 100%;
-  max-height: 80vh; /* يمنع الجدول من الطفو للأسفل أكثر من الشاشة */
-  margin: 0 auto;
-  overflow: auto;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-  touch-action: pinch-zoom pan-x;
-    text-align: center;               /* يبقي الجدول بالوسط بدون كسر sticky */
-}
+
 
 .table-container table {
   margin: 0; /* ثابت بدون وسط */
-}
-/* ✅ تثبيت عمود الاختيار */
-td:first-child, th:first-child {
-  position: sticky;
-  left: 0;
-  background: white;
-  z-index: 30;
-}
-
-/* 🎯 تثبيت عمود التسلسل (#) يمين عمود الاختيار */
-td:nth-child(2), th:nth-child(2) {
-  position: sticky;
-  left: 60px;
-  background: white;
-  z-index: 29;
 }
 
 /* 🎯 تثبيت رأس الجدول (الصف العلوي) */
@@ -327,15 +258,29 @@ thead th {
   color: white;
   z-index: 40;
 }
-/* 🔵 حاوية الجدول */
+/* 🎯 حاوية الجدول — ثبات كامل وحركة سلسة */
 .table-container {
-  position: relative;
   width: 100%;
-  overflow: auto;
+  height: 80vh;
+  overflow-x: auto;      /* تحريك يمين/يسار */
+  overflow-y: auto;      /* تحريك فوق/تحت */
+  -webkit-overflow-scrolling: touch; /* سلاسة آيفون */
   background: white;
   border-radius: 10px;
-  touch-action: pan-x pinch-zoom;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  position: relative;
+  touch-action: pan-y pan-x;   /* السماح بالتحريك كل الاتجاهات بدون هزة */
 }
+
+/* 🎯 الجدول نفسه */
+.table-container table {
+  margin: 0;
+  min-width: 1400px;
+  width: max-content;
+  transform-origin: top right !important; /* حتى يبقى ثابت يمين */
+  transition: transform 0.15s ease-out;
+}
+
 
 /* 🟠 الجدول نفسه يبقى ثابت يمين وفوك عند التكبير */
 .table-container table {
@@ -367,6 +312,17 @@ td:nth-child(2), th:nth-child(2) {
   right: 60px;
   background: white;
   z-index: 39;
+}
+/* 🎯 إصلاح السحب والتمرير النهائي */
+.table-container {
+  touch-action: pan-y !important;    /* يسمح بالنزول بسلاسة */
+  overflow-y: auto;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;  /* سرعة رهيبة على الآيفون */
+}
+
+table {
+  touch-action: pan-x;   /* فقط يمين/يسار داخل الجدول */
 }
 
 
