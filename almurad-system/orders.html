@@ -77,19 +77,6 @@ input, select, textarea, button {
 
 
 
-
-table {
-  width: max-content;
-  min-width: 100%;
-  transform-origin: 0 0;
-  touch-action: pan-x pan-y;
-}
-
-body {
-  transform-origin: 0 0;
-  touch-action: pan-x pan-y pinch-zoom !important; /* 🔥 يسمح بالسحب والتكبير الحر */
-}
-
 thead th {
   position: sticky;
   top: 0;
@@ -261,6 +248,8 @@ thead th {
 /* 🎯 حاوية الجدول — ثبات كامل وحركة سلسة */
 .table-container {
   width: 100%;
+    touch-action: pan-x pan-y !important;
+
   height: 80vh;
   overflow-x: auto;      /* تحريك يمين/يسار */
   overflow-y: auto;      /* تحريك فوق/تحت */
@@ -321,9 +310,7 @@ td:nth-child(2), th:nth-child(2) {
   -webkit-overflow-scrolling: touch;  /* سرعة رهيبة على الآيفون */
 }
 
-table {
-  touch-action: pan-x;   /* فقط يمين/يسار داخل الجدول */
-}
+
 
 
   </style>
