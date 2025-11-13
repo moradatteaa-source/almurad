@@ -2017,9 +2017,9 @@ const maxZoom = 2.5;
 const minZoom = 0.2;
 
 function applyZoom() {
-  table.style.transform = `scale(${zoomLevel})`;
-table.style.transformOrigin = "center center";
-  tableContainer.scrollLeft = 0;              // 👈 يمنع تحريك الجدول لليسار
+tableContainer.style.transform = `scale(${zoomLevel})`;
+tableContainer.style.transformOrigin = "top right";
+            // 👈 يمنع تحريك الجدول لليسار
 }
 
 
