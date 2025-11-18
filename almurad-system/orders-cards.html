@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الطلبات</title>
+
+<style>
+
+  /* ▼ تحميل خط Tajawal المحلي ▼ */
+  @font-face {
+    font-family: 'Tajawal';
+    src: url('Tajawal-Regular.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+  }
+
+  body {
+    font-family: 'Tajawal', sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f4f4f4;
+  }
+
+  .order-card {
+    background: #fff;
+    margin: 10px;
+    padding: 12px;
+    border-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.08);
+    cursor: pointer;
+  }
+
+  /* ▼ يمين الكارت — المنتج + رقم الطلب + التاريخ ▼ */
+  .right-side {
+    text-align: right;
+  }
+
+  .date {
+    font-size: 11px;
+    color: #777;
+    opacity: 0.8;
+    margin-bottom: 4px;
+    font-weight: normal !important;
+  }
+
+  .order-id {
+    font-size: 12px;
+    color: #222;
+    font-weight: normal !important;
+  }
+
+.product-name {
+    color: #FF6B2D;
+    font-size: 12px;   /* 🔥 صغرنا الخط */
+    font-weight: bold;
+    margin-top: 3px;
+}
+
+
+  /* ▼ يسار الكارت — العدد + السعر + المعلن ▼ */
+  .left-side {
+    text-align: left;
+  }
+
+  .qty {
+    font-size: 12px;
+    color: #333;
+    font-weight: normal !important;
+  }
+
+  .price {
+    font-size: 13px;
+    color: #000;
+    font-weight: normal !important;
+    margin-top: 4px;
+  }
+
+  .advertiser {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+    font-weight: normal !important;
+  }
+
+  .line {
+    height: 1px;
+    background: #ddd;
+    margin: 6px 0 0 0;
+  }
+
+</style>
+
+</head>
+
+<body>
+
+<h2 style="text-align:center; background:#043B64; color:white; padding:12px; margin:0;">الطلبات</h2>
+
+<div id="ordersList"></div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+  import { getDatabase, ref, onValue }
+    from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDtEJYJrmyP45qS2da8Cuc6y6Jv5VD0Uhc",
+    authDomain: "almurad-system.firebaseapp.com",
+    databaseURL: "https://almurad-system-default-rtdb.firebaseio.com/",
+    projectId: "almurad-system",
+    storageBucket: "almurad-system.appspot.com",
+    messagingSenderId: "911755824405",
+    appId: "1:911755824405:web:2bfbd18ddcf038ca48ad1c"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const ordersRef = ref(db, "orders");
+
+  const ordersList = document.getElementById("ordersList");
+// 🟣 قراءة الفلترة من الرابط
+const params = new URLSearchParams(window.location.search);
+const filterStatus = params.get("status") || "";
+
+  function formatPrice(num) {
+    return Number(num).toLocaleString("en-US");
+  }
+
+  function formatDateOnly(full) {
+    if (!full) return "";
+    return full.split("T")[0];
+  }
+
+  onValue(ordersRef, (snapshot) => {
+    if (!snapshot.exists()) {
+      ordersList.innerHTML = "<p style='text-align:center'>لا توجد طلبات</p>";
+      return;
+    }
+
+    const data = snapshot.val();
+const orders = Object.entries(data)
+  .map(([id, o]) => ({ id, ...o }))
+.filter(o => {
+  const st = (o.status || "").trim();
+
+// 🟦 الحالات المعروفة
+const knownStatuses = [
+  "مثبت",
+  "قيد المعالجة",
+  "قيد التجهيز",
+  "قيد التوصيل",
+  "تم التسليم",
+  "راجع",
+  "تم استلام الراجع",
+  "رفض",
+  "بانتظار البضاعة"
+];
+
+// 🟣 عرض الحالات الأخرى
+if (filterStatus === "حالات أخرى") {
+  return st !== "" && !knownStatuses.includes(st);
+}
+
+
+  // 🟢 الفلترة العادية
+  return !filterStatus || st === filterStatus;
+})
+  .sort((a, b) => (b.enterIndex || 0) - (a.enterIndex || 0));
+
+
+    ordersList.innerHTML = "";
+
+orders.forEach((o) => {
+
+  // ⭐ عرض فقط الطلبات الجديدة إذا ماكو فلتر
+  if (filterStatus === "" && o.status && o.status.trim() !== "") {
+    return;
+  }
+
+const card = document.createElement("div");
+card.className = "order-card";
+card.setAttribute("data-id", o.id); // NEW
+
+
+card.innerHTML = `
+  <div class="right-side">
+    <div class="date">${formatDateOnly(o.orderDate)}</div>
+    <div class="order-id">#${o.id}</div>
+    <div class="product-name">${o.productName || "-"}</div>
+  </div>
+
+  <div class="left-side">
+    <div class="qty">${o.quantity || 1}</div>
+    <div class="price">${formatPrice(o.price || 0)} د.ع</div>
+    <div class="advertiser">${o.advertiser || ""}</div>
+  </div>
+
+  <div class="hidden-data" style="display:none"
+       data-status="${o.status}"
+       data-city="${o.city}"
+       data-area="${o.area}"
+       data-notes="${o.notes}"
+       data-receipt="${o.receiptNum}"
+       data-code="${o.code}"
+       data-fixedby="${o.fixedBy}"
+       data-updatedby="${o.updatedBy}"
+       data-product="${o.productName}"
+       data-quantity="${o.quantity}"
+       data-price="${o.price}">
+  </div>
+`;
+
+
+
+card.onclick = () => {
+  // 🟧 حفظ رقم الطلب
+  localStorage.setItem("selectedOrder", o.id);
+
+  // 🟦 حفظ مكان التمرير
+  localStorage.setItem("previousScrollPosition", window.scrollY);
+
+  // 🟩 حفظ حالة الفلترة الحالية
+  localStorage.setItem("currentFilterStatus", filterStatus);
+
+  // 🔥 الدخول بدون إضافة صفحة للهستوري
+window.location.href = "order-details.html";
+};
+
+
+
+
+      ordersList.appendChild(card);
+
+      const line = document.createElement("div");
+      line.className = "line";
+      ordersList.appendChild(line);
+    });
+  });
+  
+</script>
+<script>
+let restoreScroll = false;
+let savedScroll = 0;
+
+// 📌 استقبال رسالة الرجوع من صفحة التفاصيل
+window.addEventListener("message", (event) => {
+  if (event.data === "closeDetails") {
+    savedScroll = parseInt(localStorage.getItem("previousScrollPosition")) || 0;
+    localStorage.setItem("restoreAfterFirebase", savedScroll);
+    restoreScroll = true;
+  }
+});
+
+// 📌 عند تحميل بيانات Firebase نعيدك لمكانك الحقيقي
+onValue(ordersRef, (snapshot) => {
+
+  // 😎 تبقى معالجة الكروت كما هي عندك
+
+  if (restoreScroll) {
+    setTimeout(() => {
+      const y = parseInt(localStorage.getItem("restoreAfterFirebase")) || 0;
+      window.scrollTo(0, y);
+    }, 250);
+  }
+});
+
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  const savedStatus = localStorage.getItem("currentFilterStatus");
+
+  if (savedStatus && savedStatus !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+
+    if (!params.get("status")) {
+      params.set("status", savedStatus);
+      window.history.replaceState({}, "", `${location.pathname}?${params.toString()}`);
+    }
+  }
+});
+
+
+</script>
+
+</body>
+</html> 

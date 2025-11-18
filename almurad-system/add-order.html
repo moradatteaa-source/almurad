@@ -710,7 +710,7 @@ function updateTotals() {
   renderProductTags();
 
   // ✅ تحميل المتغيرات للمنتج الرئيسي
-  const mainCard = document.querySelector(".card"); // البطاقة الأساسية
+const mainCard = document.querySelector("#product").parentElement;
   mainProductObj = {}; // 🟢 استخدم المتغير العام بدل التعريف المحلي
 await loadVariantsForProduct(mainCard, val, mainProductObj);
 
@@ -816,63 +816,59 @@ const order = {
   status: document.querySelector("#status input")?.value || "",
   advertiser: document.getElementById("advertiser").value.trim(),
   orderDate: new Date().toISOString(),
+
+  // ⭐⭐⭐ هذا السطر هو المهم جداً ⭐⭐⭐
+  enterIndex: Date.now(),
+
   extraProducts: extraProducts,
-  productsDetailed: productsDetailed // ✅ هذا هو السطر الجديد المهم
+  productsDetailed: productsDetailed
 };
-// ✅ حفظ الطلب في Firebase
-const newRef = push(ref(db, "orders"));
-await set(newRef, order);
+// 🟢 إضافة fixedBy إذا الحالة أولها مثبت أو رفض
+const userName =
+  loggedUser?.displayName ||
+  loggedUser?.name ||
+  loggedUser?.username ||
+  "غير معروف";
+
+if (order.status === "مثبت" || order.status === "رفض") {
+  order.fixedBy = userName; // ثابت وما يتغير أبداً
+}
+
+order.updatedBy = userName; // يتحدث دائمًا
+
+
+// ✅ حفظ الطلب بتسلسل مرتب
+const ordersRef = ref(db, "orders");
+const snap = await get(ordersRef);
+
+let nextId = 1;
+
+if (snap.exists()) {
+  const allIds = Object.keys(snap.val())
+    .map(k => Number(k))
+    .filter(n => !isNaN(n));
+
+  if (allIds.length > 0) {
+    nextId = Math.max(...allIds) + 1;
+  }
+}
+
+await set(ref(db, `orders/${nextId}`), order);
+
+// 🟢 خصم المخزون فورًا
+await updateStockOnOrderCreate(productsDetailed);
 
 // 🟢 عرض رسالة نجاح مؤقتة قبل الانتقال
 document.getElementById("savedMsg").style.display = "block";
 setTimeout(() => {
-  window.location.href = "orders.html";
+  window.location.href = "dashboard.html";
 }, 800);
 
 
-// 🟢 دالة تخصم الكمية من المخزن مباشرة بعد إضافة الطلب
-async function updateStockImmediately(productsDetailed) {
-  const snap = await get(ref(db, "warehouse"));
-  if (!snap.exists()) return;
 
-  const warehouse = snap.val();
 
-  for (const item of productsDetailed) {
-    const { name, qty, variants } = item;
-    if (!name || !qty) continue;
 
-    const product = warehouse[name];
-    if (!product || !product.stock) {
-      console.warn(`⚠️ المنتج ${name} غير موجود في المخزن`);
-      continue;
-    }
 
-    const stock = product.stock;
-    const variantKey = Object.entries(variants)
-      .map(([k, v]) => `${k} | ${v}`)
-      .join(" | ");
-
-    let matchedKey = Object.keys(stock).find(k => k.trim() === variantKey.trim());
-
-    if (matchedKey && stock[matchedKey] !== undefined) {
-      const before = stock[matchedKey];
-      stock[matchedKey] = Math.max(0, before - qty);
-
-      console.log(`📦 خصم ${qty} من ${name} (${matchedKey}) | قبل: ${before} → بعد: ${stock[matchedKey]}`);
-
-      // تحديث المخزون والإجمالي
-      const totalQty = Object.entries(stock)
-        .filter(([k]) => k !== "إجمالي الكمية")
-        .reduce((sum, [, val]) => sum + (Number(val) || 0), 0);
-
-      await set(ref(db, `warehouse/${name}/stock`), stock);
-      await set(ref(db, `warehouse/${name}/totalQty`), totalQty);
-      console.log(`✅ تم تحديث ${name} بنجاح`);
-    } else {
-      console.warn(`⚠️ لم يتم العثور على متغير مطابق لـ ${name} (${variantKey})`);
-    }
-  }
-}
 
 
 
@@ -908,6 +904,65 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+
+async function updateStockOnOrderCreate(productsDetailed) {
+  const snap = await get(ref(db, "warehouse"));
+  if (!snap.exists()) return;
+
+  const warehouse = snap.val();
+
+  for (const item of productsDetailed) {
+    const { name, qty, variants } = item;
+    if (!name || !qty) continue;
+
+    const product = warehouse[name];
+    if (!product || !product.stock) continue;
+
+    const stock = product.stock;
+
+    // 🟢 صياغة المتغيرات مثل صفحة التفاصيل
+    const variantValues = Object.values(variants || {}).map(v => v.trim().toLowerCase());
+
+    let foundKey = null;
+
+    // 🟢 محاولة إيجاد المتغير المطابق
+    for (const key of Object.keys(stock)) {
+      const keyNorm = key.toLowerCase();
+      const matches = variantValues.filter(v => keyNorm.includes(v)).length;
+
+      if (matches === variantValues.length && matches > 0) {
+        foundKey = key;
+        break;
+      }
+    }
+
+    // 🟢 إذا لقى متغير → ينقص منه فقط
+    if (foundKey && stock[foundKey] !== undefined) {
+      const before = Number(stock[foundKey]) || 0;
+      const after = before - qty;
+      stock[foundKey] = after;
+
+      await set(ref(db, `warehouse/${name}/stock/${foundKey}`), after);
+    }
+
+    // 🟢 إذا ماكو متغيرات للمنتج → ينقص من إجمالي الكمية
+    else if (stock["إجمالي الكمية"] !== undefined) {
+      const before = Number(stock["إجمالي الكمية"]) || 0;
+      const after = before - qty;
+      stock["إجمالي الكمية"] = after;
+
+      await set(ref(db, `warehouse/${name}/stock/إجمالي الكمية`), after);
+    }
+
+    // 🔄 إعادة حساب الإجمالي مثل صفحة التفاصيل
+    let totalQty = 0;
+    for (const val of Object.values(stock)) {
+      totalQty += Number(val) || 0;
+    }
+
+    await set(ref(db, `warehouse/${name}/totalQty`), totalQty);
+  }
+}
 
 
   </script>

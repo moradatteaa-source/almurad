@@ -225,6 +225,8 @@ p, div, span, button {
       <div onclick="openOrders('راجع')">الطلبات الراجعة</div>
       <div onclick="openOrders('رفض')">الطلبات المرفوضة</div>
       <div onclick="openOrders('بانتظار البضاعة')">بانتظار البضاعة</div>
+      <div onclick="openOrders('حالات أخرى')">حالات أخرى</div>
+
 
       <div style="background:#FF6B2D;color:white;font-weight:bold;text-align:center;cursor:pointer" onclick="openNewOrder()">➕ إضافة طلب جديد</div>
     </div>
@@ -303,6 +305,10 @@ p, div, span, button {
   <h3>بانتظار البضاعة</h3>
   <p id="waitingCount">0</p>
 </div>
+<div class="card" data-status="حالات أخرى">
+  <h3>حالات أخرى</h3>
+  <p id="otherCount">0</p>
+</div>
 
       <!-- 🟠 إضافة طلب جديد -->
       <div class="card" id="card-add" style="background:#FF6B2D;color:white;">
@@ -351,9 +357,22 @@ if (user && (user.username === "admin" || (user.roles && user.roles.includes("ad
 
       const ordersData = snapshot.val();
       const orders = Object.values(ordersData);
+const mainStatuses = [
+  "",
+  "مثبت",
+  "قيد المعالجة",
+  "قيد التجهيز",
+  "بانتظار البضاعة",
+  "قيد التوصيل",
+  "تم التسليم",
+  "راجع",
+  "تم استلام الراجع",
+  "رفض"
+];
 
-   const counts = {
-  "": 0,
+// الإحصائيات
+const counts = {
+  "": 0, // جديد
   "مثبت": 0,
   "قيد المعالجة": 0,
   "قيد التجهيز": 0,
@@ -362,23 +381,29 @@ if (user && (user.username === "admin" || (user.roles && user.roles.includes("ad
   "تم التسليم": 0,
   "راجع": 0,
   "تم استلام الراجع": 0,
-  "رفض": 0
+  "رفض": 0,
+  "حالات أخرى": 0
 };
-
 
 orders.forEach(o => {
   let st = (o.status || "").trim();
 
-  // 🟢 توحيد الحالات الفارغة
-  if (!st || st === "" || st === "غير محدد" || typeof st === "undefined") {
-    st = "";
+  // 🟦 1) الفارغ = طلب جديد
+  if (st === "") {
+    counts[""]++;
+    return;
   }
 
-  // ✅ نحسب فقط الحالات اللي نعرفها مسبقًا
-  if (counts.hasOwnProperty(st)) {
+  // 🟩 2) الحالة ضمن الحالات الرئيسية
+  if (mainStatuses.includes(st)) {
     counts[st]++;
+    return;
   }
+
+  // 🟧 3) أي حالة غير موجودة = حالات أخرى
+  counts["حالات أخرى"]++;
 });
+
 
 
 
@@ -394,11 +419,12 @@ orders.forEach(o => {
 
       document.getElementById("rejectedCount").textContent = counts["رفض"];
       document.getElementById("waitingCount").textContent = counts["بانتظار البضاعة"];
+document.getElementById("otherCount").textContent = counts["حالات أخرى"];
 
     }
 function openOrders(status) {
   // ✅ إذا الحالة فارغة (طلبات جديدة) نمرر باراميتر فاضي
-  window.location.href = `orders.html?status=${encodeURIComponent(status || "")}`;
+window.location.href = `orders-cards.html?status=${encodeURIComponent(status || "")}`;
 }
 
 
