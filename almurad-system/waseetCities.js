@@ -1,5 +1,4 @@
-export const waseetCities = [
-  {
+window.waseetCities = [  {
     "id": "1",
     "city_name": "بغداد"
   },

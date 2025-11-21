@@ -1,5 +1,4 @@
-export const waseetRegions = [
-  {
+window.waseetRegions = [  {
     "id": "1",
     "region_name": "شارع فلسطين",
     "city_id": "1"

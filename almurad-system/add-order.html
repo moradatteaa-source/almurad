@@ -154,14 +154,14 @@
 
    /* 🔹 تمييز المنتجات الإضافية */
 .extra-product {
-  background: #e9f0f7; /* لون أفتح من الخلفية العادية */
-  border-left: 4px solid var(--accent-orange); /* خط جانبي برتقالي */
-  border-radius: 10px;
-  padding: 15px 20px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 15px;
   margin-top: 15px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.08);
   position: relative;
-  transition: all 0.2s ease-in-out;
 }
+
 
 /* تأثير بسيط عند المرور */
 .extra-product:hover {
@@ -710,9 +710,9 @@ function updateTotals() {
   renderProductTags();
 
   // ✅ تحميل المتغيرات للمنتج الرئيسي
-const mainCard = document.querySelector("#product").parentElement;
-  mainProductObj = {}; // 🟢 استخدم المتغير العام بدل التعريف المحلي
+const mainCard = document.querySelector("#product").closest(".card");
 await loadVariantsForProduct(mainCard, val, mainProductObj);
+
 
 });
 
@@ -800,7 +800,6 @@ extraProducts.forEach(p => {
     });
   }
 });
-
 // 🟢 إنشاء الطلب
 const order = {
   code: document.getElementById("code").value.trim(),
@@ -809,20 +808,36 @@ const order = {
   address: document.getElementById("address").value.trim(),
   city: document.querySelector("#city input")?.value || "",
   area: document.querySelector("#area input")?.value || "",
-  productName: combinedNames,
+
+  // 🟢 المنتج الرئيسي فقط
+  productName: mainName,
+
+  // 🟢 السعر الرئيسي فقط
+  price: mainPrice,
+
+  // 🟢 كمية المنتج الرئيسي فقط
+  quantity: mainQty,
+
+  // 🟢 كل المنتجات (الرئيسي + الإضافية)
+  totalProducts: combinedNames,
+
+  // 🟢 الإجماليات
+  totalQty: totalQty,
+  totalPrice: totalPrice,
+
+  // 🟢 الملاحظات
   notes: finalNotes,
-  price: totalPrice,
-  quantity: totalQty,
+
   status: document.querySelector("#status input")?.value || "",
   advertiser: document.getElementById("advertiser").value.trim(),
   orderDate: new Date().toISOString(),
 
-  // ⭐⭐⭐ هذا السطر هو المهم جداً ⭐⭐⭐
-  enterIndex: Date.now(),
+  enterIndex: Date.now(), // مهم جداً
 
   extraProducts: extraProducts,
   productsDetailed: productsDetailed
 };
+
 // 🟢 إضافة fixedBy إذا الحالة أولها مثبت أو رفض
 const userName =
   loggedUser?.displayName ||

@@ -144,6 +144,47 @@ body {
   font-size:22px;
   cursor:pointer;
 ">⋮</span>
+<!-- ▼▼▼ القائمة الخاصة بالوسيط ▼▼▼ -->
+<div id="menuDropdown" style="
+    display:none;
+    position:absolute;
+    left:10px;
+    top:60px;
+    background:white;
+    border:1px solid #ddd;
+    border-radius:8px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.2);
+    z-index:99999;
+    width:180px;
+  
+">
+<style>
+  #menuDropdown .menu-item {
+    color: #043B64 !important;
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  #menuDropdown .menu-item:hover {
+    background: #f2f2f2;
+  }
+</style>
+
+ <div class="menu-item" id="updateFromWaseet" style="padding:10px; cursor:pointer; border-bottom:1px solid #eee;">
+  🔁 تحديث الطلبات
+</div>
+
+<div class="menu-item" id="sendToWaseet" style="padding:10px; cursor:pointer; border-bottom:1px solid #eee;">
+  📤 رفع الطلبات للشحن
+</div>
+
+<div class="menu-item" id="shippingLogs" style="padding:10px; cursor:pointer;">
+  📦 سجل الشحنات
+</div>
+
+
+</div>
+<!-- ▲▲▲ نهاية القائمة ▲▲▲ -->
 
 <!-- 2️⃣ البحث (SVG) -->
 <svg id="searchIcon" xmlns="http://www.w3.org/2000/svg"
@@ -166,6 +207,7 @@ body {
 </svg>
 
 </h2>
+
 <!-- ⭐ صندوق الفلترة الجديد الاحترافي -->
 <div id="filterBoxContainer" style="
   display:none;
@@ -278,6 +320,7 @@ body {
 <div id="ordersList"></div>
 
 <script type="module">
+
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
   import { getDatabase, ref, onValue }
     from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
@@ -449,7 +492,45 @@ document.getElementById("ordersList").style.marginTop = "150px";
   });
   
 </script>
-<script>
+<script type="module">
+import {
+  sendOrdersToWaseet,
+  updateOrdersStatusFromWaseet,
+  loginToWaseet
+} from "./deliveryService.js";
+
+document.getElementById("sendToWaseet").onclick = () => {
+  window.location.href = "send-shipping.html";
+};
+
+
+
+// ⭐ زر: تحديث الحالات من الوسيط
+document.getElementById("updateFromWaseet").onclick = async () => {
+  const sentOrders = masterOrders.filter(o => o.receiptNum);
+
+  if (sentOrders.length === 0) {
+    alert("لا توجد طلبات مرتبطة بالوسيط.");
+    return;
+  }
+
+  alert("جاري جلب الحالات...");
+
+  const statuses = await updateOrdersStatusFromWaseet(sentOrders);
+
+  console.log(statuses);
+  alert("تم تحديث الحالات.");
+
+  location.reload();
+};
+
+
+document.getElementById("shippingLogs").onclick = () => {
+  localStorage.setItem("logsSource", "orders");
+  window.location.href = "shipping-logs.html";
+};
+
+
 document.addEventListener("DOMContentLoaded", () => {
 
   // ⭐ استعادة التمرير من صفحة التفاصيل
@@ -546,6 +627,18 @@ function renderOrders(list) {
     ordersList.appendChild(line);
   });
 }
+// ⭐ فتح وإغلاق قائمة الوسيط (⋮)
+document.getElementById("menuIcon").onclick = () => {
+  const box = document.getElementById("menuDropdown");
+  box.style.display = box.style.display === "none" ? "block" : "none";
+};
+
+// إغلاق القائمة عند الضغط خارجها
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#menuIcon") && !e.target.closest("#menuDropdown")) {
+    document.getElementById("menuDropdown").style.display = "none";
+  }
+});
 
 // ⭐ فتح البحث
 document.getElementById("searchIcon").onclick = () => {
