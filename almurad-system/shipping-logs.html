@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>سجلات الشحن</title>
@@ -444,9 +447,6 @@ function generateReceiptHTML(order, pageNumber) {
   font-weight:bold;">
   رقم الوصل: ${order.receiptNum || "--"}
 </div>
-<div style="text-align:center; font-size:10px; margin-top:2px; color:#333;">
-  الصفحة: ${pageNumber}
-</div>
 
 <!-- التاريخ + رقم الطلب -->
 <div style="display:flex; justify-content:space-between; margin-top:0mm; font-size:11px;">
@@ -515,70 +515,114 @@ function generateReceiptHTML(order, pageNumber) {
   </tbody>
 </table>
 
+<!-- رقم الصفحة أسفل الوصل -->
+<div style="
+  position:absolute;
+  bottom:2mm;
+  left:0;
+  right:0;
+  text-align:center;
+  font-size:11px;
+  font-weight:bold;
+">
+  ${pageNumber}
+</div>
 
 </div>
 `;
 }
 
+// ========== 1) تحويل HTML إلى PDF بدون html2canvas ==========
+async function generatePDF(html, fileName) {
+  const { jsPDF } = window.jspdf;
+
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: [80, 120],
+  });
+
+  const temp = document.createElement("div");
+  temp.innerHTML = html;
+  temp.style.width = "80mm";
+  temp.style.position = "absolute";
+  temp.style.left = "-9999px";
+  document.body.appendChild(temp);
+
+  // تحويل الصفحة كلها إلى صورة بدقة عالية
+  const canvas = await html2canvas(temp, {
+    scale: 4,
+    useCORS: true,
+    backgroundColor: "#ffffff"
+  });
+
+  const img = canvas.toDataURL("image/png");
+
+  pdf.addImage(img, "PNG", 0, 0, 80, 120);
+
+  document.body.removeChild(temp);
+
+  const blob = pdf.output("blob");
+  const pdfFile = new File([blob], fileName, { type: "application/pdf" });
+
+  if (navigator.share) {
+    await navigator.share({
+      title: fileName,
+      files: [pdfFile]
+    });
+  } else {
+    const url = URL.createObjectURL(pdfFile);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+  }
+}
 
 
-// ⭐ اجعل دالة الطباعة متاحة للـ HTML
+
+// ========== 2) طباعة وصل واحد ==========
 window.printSingleOrder = async function (orderId) {
-  // جلب الطلب من الريل تايم
   const snap = await get(ref(db, "orders/" + orderId));
   if (!snap.exists()) {
     alert("الطلب غير موجود");
     return;
   }
-  
 
   const order = snap.val();
   order.id = orderId;
+  order.totalPrice = order.totalPrice || 0;
+  order.totalQty = order.totalQty || 0;
+  order.totalProducts = order.totalProducts || "";
   order.productsDetailed = order.productsDetailed || [];
+  order.receiptNum = order.receiptNum || "";
 
-order.totalPrice = order.totalPrice || 0;
-order.totalQty = order.totalQty || 0;
-order.totalProducts = order.totalProducts || "";
+  const html = generateReceiptHTML(order, 1);
 
-
-  // إنشاء HTML للوصل
-  const html = generateReceiptHTML(order);
-
-  // وضع المحتوى في منطقة الطباعة
-  const printArea = document.getElementById("printArea");
-  printArea.innerHTML = html;
-
-  // البدأ بالطباعة
-  const original = document.body.innerHTML;
-  document.body.innerHTML = printArea.innerHTML;
-
-  window.print();
-
-  // استرجاع الصفحة
-  document.body.innerHTML = original;
-  location.reload();
+  await generatePDF(html, `order_${orderId}.pdf`);
 };
 
+
+
+// ========== 3) طباعة كل الطلبات في سجل واحد ==========
 window.printInvoice = async function (logId) {
-
   const snap = await get(ref(db, "shippingLogs/" + logId + "/orders"));
-  if (!snap.exists()) {
-    alert("لا توجد طلبات داخل الفاتورة");
-    return;
-  }
+  if (!snap.exists()) return alert("لا توجد طلبات للطباعة");
 
-  const orders = Object.values(snap.val());
-  const successOrders = orders.filter(o => o.status === "success");
+  const orders = Object.values(snap.val()).filter(o => o.status === "success");
+  if (orders.length === 0) return alert("لا توجد طلبات ناجحة");
 
-  if (successOrders.length === 0) {
-    alert("لا توجد طلبات ناجحة للطباعة");
-    return;
-  }
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: [80, 120],
+  });
 
-  let allHTML = "";
+  let firstPage = true;
   let pageNum = 1;
 
-  for (const o of successOrders) {
+  for (const o of orders) {
 
     const orderSnap = await get(ref(db, "orders/" + o.orderId));
     if (!orderSnap.exists()) continue;
@@ -586,22 +630,58 @@ window.printInvoice = async function (logId) {
     const order = orderSnap.val();
     order.id = o.orderId;
     order.receiptNum = o.receiptNum || "";
-    order.productsDetailed = order.productsDetailed || [];
     order.totalPrice = order.totalPrice || 0;
     order.totalQty = order.totalQty || 0;
     order.totalProducts = order.totalProducts || "";
+    order.productsDetailed = order.productsDetailed || [];
 
-    allHTML += generateReceiptHTML(order, pageNum) + "<div style='page-break-after: always;'></div>";
+    const html = generateReceiptHTML(order, pageNum);
+
+    const temp = document.createElement("div");
+    temp.innerHTML = html;
+    temp.style.width = "80mm";
+    temp.style.position = "absolute";
+    temp.style.left = "-9999px";
+    document.body.appendChild(temp);
+
+    const canvas = await html2canvas(temp, {
+      scale: 4,
+      useCORS: true,
+      backgroundColor: "#ffffff"
+    });
+
+    const img = canvas.toDataURL("image/png");
+
+    if (!firstPage) {
+      pdf.addPage();
+    }
+
+    pdf.addImage(img, "PNG", 0, 0, 80, 120);
+
+    firstPage = false;
     pageNum++;
+
+    document.body.removeChild(temp);
   }
 
-  const original = document.body.innerHTML;
-  document.body.innerHTML = allHTML;
+  // الإخراج النهائي
+  const blob = pdf.output("blob");
+  const file = new File([blob], `invoice_${logId}.pdf`, { type: "application/pdf" });
 
-  window.print();
-  document.body.innerHTML = original;
-  location.reload();
+  if (navigator.share) {
+    await navigator.share({
+      title: `invoice_${logId}`,
+      files: [file]
+    });
+  } else {
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `invoice_${logId}.pdf`;
+    link.click();
+  }
 };
+
 
 
 

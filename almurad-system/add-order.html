@@ -775,20 +775,27 @@ extraProducts.forEach(p => {
   notesArray.push(text);
 });
 
-const finalNotes = notesArray.join(" | ");
+const autoNotes = notesArray.join(" | ");
+const userNotes = document.getElementById("notes").value.trim();
+
+// لا تمسح الملاحظات المكتوبة يدوياً أبداً  
+let finalNotes = autoNotes;
+
+if (userNotes) {
+  finalNotes += " || " + userNotes;
+}
 
 
       // 🟢 بناء مصفوفة المنتجات بالتفصيل (للخصم من المخزون لاحقاً)
 const productsDetailed = [];
 
-// المنتج الرئيسي
-if (mainName) {
-  productsDetailed.push({
-    name: mainName,
-    qty: mainQty,
-    variants: mainProductObj.selectedVariants || {}
-  });
-}
+productsDetailed.push({
+  name: mainName,
+  qty: mainQty,
+  price: mainPrice || 0,   // ← أضفناه
+  variants: mainProductObj.selectedVariants || {}
+});
+
 
 // المنتجات الإضافية
 extraProducts.forEach(p => {
@@ -796,10 +803,13 @@ extraProducts.forEach(p => {
     productsDetailed.push({
       name: p.name,
       qty: p.qty,
+      price: p.price || 0,       // ✅ اضفنا السعر
       variants: p.selectedVariants || {}
     });
   }
 });
+
+
 // 🟢 إنشاء الطلب
 const order = {
   code: document.getElementById("code").value.trim(),
@@ -809,30 +819,18 @@ const order = {
   city: document.querySelector("#city input")?.value || "",
   area: document.querySelector("#area input")?.value || "",
 
-  // 🟢 المنتج الرئيسي فقط
-  productName: mainName,
+  productName: mainName, // ✓ المنتج الأساسي فقط
 
-  // 🟢 السعر الرئيسي فقط
-  price: mainPrice,
+  // ✓ الثلاث نقاط الجديدة المطلوبة
+  totalQty: totalQty,           // ← مجموع الكمية
+  totalPrice: totalPrice,       // ← مجموع السعر
+  totalProducts: combinedNames, // ← أسماء كل المنتجات
 
-  // 🟢 كمية المنتج الرئيسي فقط
-  quantity: mainQty,
-
-  // 🟢 كل المنتجات (الرئيسي + الإضافية)
-  totalProducts: combinedNames,
-
-  // 🟢 الإجماليات
-  totalQty: totalQty,
-  totalPrice: totalPrice,
-
-  // 🟢 الملاحظات
-  notes: finalNotes,
-
+  notes: finalNotes, // تبقى ثابتة وماتنمسح
   status: document.querySelector("#status input")?.value || "",
   advertiser: document.getElementById("advertiser").value.trim(),
   orderDate: new Date().toISOString(),
-
-  enterIndex: Date.now(), // مهم جداً
+  enterIndex: Date.now(),
 
   extraProducts: extraProducts,
   productsDetailed: productsDetailed
